@@ -1,0 +1,22 @@
+---
+description: DentaFlow project context. Follow before any feature work.
+alwaysApply: true
+---
+
+# DentaFlow
+
+Read `CONTEXT.md` before building. The product spec is `DentaFlow-Project-Plan-v2.md`. Visual reference is `Design Ref/`. Logos are in `Brand/`.
+
+- The real app goes in `app/`. Do not add production code under `Design Ref/`.
+- GitHub remote is https://github.com/Murabac/NISmile.git. Never commit `app/.env.local` or the service role key.
+- Stack: React, TypeScript, Vite, Tailwind 4, TanStack Query, Supabase `dental` schema, WhatsApp Cloud API via Edge Functions.
+- Staff UI is English only. Somali and Arabic are WhatsApp message content, chosen per customer. Do not add a language switcher, react-i18next, or an RTL layout.
+- Match the prototype's screens and tokens. Decisions in `CONTEXT.md` override the plan and the prototype.
+- Currency is USD. Stock changes only through the movement ledger. Checkout is one transaction.
+- Coral `#FF6B57` is for promotions only.
+- Items, services, price lists, and tax rates are shared. Customers, stock, sales, appointments, purchases, and cash are per branch. Seed one branch.
+- Prices exclude VAT. Checkout tenders are Cash, Zaad, eDahab, and MyCash (Amal Bank, not cash). Thermal receipts default to 80 mm and also support 58 mm.
+- Only the owner publishes promotions. WhatsApp uses a new dedicated number.
+- Customer-facing documents use N.I SMILE Oral care & Teeth whitening, `Brand/nismile-logo.jpg`, 26 June Road 1, Hargeisa, Somaliland, phone +252 63 4749276, tax ID 11114, Zaad 484594, eDahab 764043. MyCash prints as Pending. The staff app stays DentaFlow.
+- Do not invent the VAT percentage, loyalty rates, a MyCash account number, or WhatsApp credentials. Gaps are listed at the bottom of `CONTEXT.md`.
+- Build the current step in `CONTEXT.md`. Update that step when it is finished.

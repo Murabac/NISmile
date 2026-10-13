@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 72" width="320" height="72" role="img" aria-label="DentaFlow">
+  <defs><clipPath id="tooth"><path d="M32 10C26 6 14 6 12 18C11 26 16 30 17 38C18 46 19 56 24 56C29 56 28 44 32 44C36 44 35 56 40 56C45 56 46 46 47 38C48 30 53 26 52 18C50 6 38 6 32 10Z"/></clipPath></defs>
+  <g transform="translate(0 4)">
+    <path d="M32 10C26 6 14 6 12 18C11 26 16 30 17 38C18 46 19 56 24 56C29 56 28 44 32 44C36 44 35 56 40 56C45 56 46 46 47 38C48 30 53 26 52 18C50 6 38 6 32 10Z" fill="#0C3B4A"/>
+    <g clip-path="url(#tooth)"><path d="M0 31C12 23 22 39 33 31S52 25 64 31V64H0Z" fill="#12A6A0"/></g>
+  </g>
+  <text x="76" y="50" font-family="'Bricolage Grotesque', 'Segoe UI', system-ui, sans-serif" font-size="42" fill="#0C3B4A" letter-spacing="-0.8"><tspan font-weight="800">Denta</tspan><tspan font-weight="400">Flow</tspan></text>
+</svg>

@@ -1,0 +1,102 @@
+@import "tailwindcss";
+
+@theme {
+  --font-display: "Bricolage Grotesque", system-ui, sans-serif;
+  --font-body: "Figtree", system-ui, sans-serif;
+  --font-mono: "IBM Plex Mono", ui-monospace, monospace;
+
+  --color-marine: #0C3B4A;
+  --color-flow-teal: #12A6A0;
+  --color-enamel: #F4F8F7;
+  --color-ink: #10262D;
+  --color-coral: #FF6B57;
+  --color-coral-dark: #FF7A66;
+  --color-status-green: #2E9E6B;
+  --color-status-amber: #E0A100;
+  --color-status-red: #D64545;
+}
+
+:root {
+  --bg-primary: #F4F8F7;
+  --surface: #FFFFFF;
+  --surface-subtle: #EEF4F3;
+  --border-color: #DDE7E5;
+  --text-main: #10262D;
+  --text-muted: #536E75;
+  --primary-marine: #0C3B4A;
+  --accent-teal: #12A6A0;
+  --coral-promo: #FF6B57;
+  --status-green: #2E9E6B;
+  --status-amber: #E0A100;
+  --status-red: #D64545;
+  --sidebar-bg: #0C3B4A;
+  --sidebar-text: #E4F1EF;
+  --sidebar-hover: #144959;
+  --radius-dentaflow: 10px;
+}
+
+.dark {
+  --bg-primary: #08191F;
+  --surface: #0F2830;
+  --surface-subtle: #143540;
+  --border-color: #1A4452;
+  --text-main: #E8F2F0;
+  --text-muted: #8AA4A0;
+  --primary-marine: #2CC7BF;
+  --accent-teal: #2CC7BF;
+  --coral-promo: #FF7A66;
+  --status-green: #2E9E6B;
+  --status-amber: #E0A100;
+  --status-red: #D64545;
+  --sidebar-bg: #091C23;
+  --sidebar-text: #E8F2F0;
+  --sidebar-hover: #13333F;
+}
+
+body {
+  font-family: var(--font-body);
+  background-color: var(--bg-primary);
+  color: var(--text-main);
+  margin: 0;
+  padding: 0;
+  min-height: 100vh;
+}
+
+h1, h2, h3, h4, .font-display {
+  font-family: var(--font-display);
+}
+
+.font-mono, .tabular-nums, code, kbd {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+}
+
+/* Custom scrollbar for clinical clean aesthetic */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: rgba(18, 166, 160, 0.25);
+  border-radius: 9999px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(18, 166, 160, 0.45);
+}
+
+/* Print styles for Receipts and A4 invoices */
+@media print {
+  body {
+    background: white !important;
+    color: black !important;
+  }
+  .no-print {
+    display: none !important;
+  }
+  .print-only {
+    display: block !important;
+  }
+}

@@ -1,0 +1,6 @@
+{
+  "name": "DentaFlow - Multi-Branch Dental Inventory, Sales & Practice Management",
+  "description": "Multi-branch dental clinic platform for inventory tracking, point of sale, appointments, wholesale billing, transfers, and WhatsApp engagement.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
