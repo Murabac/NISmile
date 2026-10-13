@@ -20,7 +20,7 @@ DentaFlow is a multi-branch dental clinic system: inventory, retail and wholesal
 
 ## Locked decisions
 
-- **Name:** DentaFlow is the staff app. The clinic is N.I SMILE. GitHub remote: https://github.com/Murabac/NISmile.git (empty, not connected yet). Do not commit `app/.env.local`.
+- **Name:** DentaFlow is the staff app. The clinic is N.I SMILE. GitHub remote: https://github.com/Murabac/NISmile.git on `main`. Do not commit `app/.env.local`.
 - **Currency:** USD only. Store money as `numeric(12,2)`. No exchange rates.
 - **Staff app language:** English only. No language switcher, no translated screens, no RTL layout. Section 3.8 of the plan and the prototype's language switcher are superseded.
 - **WhatsApp languages:** message content is **Somali and Arabic**. Each customer has a preferred message language (`so` or `ar`). The sender picks that template. English is not a WhatsApp template language.
