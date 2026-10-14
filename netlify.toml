@@ -1,0 +1,14 @@
+# DentaFlow staff app lives in app/ (Vite).
+[build]
+  base = "app"
+  command = "npm run build"
+  publish = "dist"
+
+# SPA: React Router paths must fall back to index.html
+[[redirects]]
+  from = "/*"
+  to = "/index.html"
+  status = 200
+
+[build.environment]
+  NODE_VERSION = "22"
