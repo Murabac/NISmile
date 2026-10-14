@@ -1,14 +1,50 @@
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
+import { Navigate, Route, BrowserRouter, Routes } from 'react-router-dom'
+import { Shell } from './components/Shell.tsx'
+import { AuthProvider } from './lib/auth.tsx'
+import { screens } from './lib/navigation.ts'
+import { DashboardPage } from './pages/DashboardPage.tsx'
+import { LoginPage } from './pages/LoginPage.tsx'
+import { ScreenPage } from './pages/ScreenPage.tsx'
+import { PurchasesPage } from './pages/PurchasesPage.tsx'
+import { ServicesPage } from './pages/ServicesPage.tsx'
+import { SettingsPage } from './pages/SettingsPage.tsx'
+import { StockPage } from './pages/StockPage.tsx'
+
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      staleTime: 30_000,
+      retry: 1,
+    },
+  },
+})
+
+function screenElement(path: string) {
+  if (path === '/') return <DashboardPage />
+  if (path === '/stock') return <StockPage />
+  if (path === '/services') return <ServicesPage />
+  if (path === '/purchases') return <PurchasesPage />
+  if (path === '/settings') return <SettingsPage />
+  return <ScreenPage />
+}
+
 export default function App() {
   return (
-    <main className="flex min-h-screen items-center justify-center bg-white px-6 text-slate-900">
-      <div className="max-w-lg">
-        <p className="text-sm font-medium tracking-wide text-slate-500">DentaFlow</p>
-        <h1 className="mt-2 text-3xl font-semibold">Staff app</h1>
-        <p className="mt-3 text-slate-600">
-          English interface for N.I SMILE Oral care & Teeth whitening. Theme, login, and
-          screens are the next steps.
-        </p>
-      </div>
-    </main>
+    <QueryClientProvider client={queryClient}>
+      <AuthProvider>
+        <BrowserRouter>
+          <Routes>
+            <Route path="/login" element={<LoginPage />} />
+            <Route element={<Shell />}>
+              {screens.map((screen) => (
+                <Route key={screen.id} path={screen.path} element={screenElement(screen.path)} />
+              ))}
+            </Route>
+            <Route path="*" element={<Navigate to="/" replace />} />
+          </Routes>
+        </BrowserRouter>
+      </AuthProvider>
+    </QueryClientProvider>
   )
 }

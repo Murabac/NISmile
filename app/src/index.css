@@ -1,1 +1,136 @@
 @import 'tailwindcss';
+
+/* Class-based dark mode. The staff app stays left to right. */
+@custom-variant dark (&:where(.dark, .dark *));
+
+@theme {
+  --font-display: 'Bricolage Grotesque', system-ui, sans-serif;
+  --font-body: 'Figtree', system-ui, sans-serif;
+  --font-mono: 'IBM Plex Mono', ui-monospace, monospace;
+
+  --color-marine: #0c3b4a;
+  --color-flow-teal: #12a6a0;
+  --color-enamel: #f4f8f7;
+  --color-ink: #10262d;
+  --color-coral: #ff6b57;
+  --color-coral-dark: #ff7a66;
+  --color-status-green: #2e9e6b;
+  --color-status-amber: #e0a100;
+  --color-status-red: #d64545;
+
+  --radius-dentaflow: 10px;
+}
+
+@theme inline {
+  --color-canvas: var(--bg-primary);
+  --color-surface: var(--surface);
+  --color-subtle: var(--surface-subtle);
+  --color-line: var(--border-color);
+  --color-main: var(--text-main);
+  --color-muted: var(--text-muted);
+  --color-action: var(--primary-marine);
+  --color-accent: var(--accent-teal);
+  --color-promo: var(--coral-promo);
+  --color-sidebar: var(--sidebar-bg);
+  --color-sidebar-text: var(--sidebar-text);
+}
+
+:root {
+  color-scheme: light;
+  --bg-primary: #f4f8f7;
+  --surface: #ffffff;
+  --surface-subtle: #eef4f3;
+  --border-color: #dde7e5;
+  --text-main: #10262d;
+  --text-muted: #536e75;
+  --primary-marine: #0c3b4a;
+  --accent-teal: #12a6a0;
+  --coral-promo: #ff6b57;
+  --status-green: #2e9e6b;
+  --status-amber: #e0a100;
+  --status-red: #d64545;
+  --sidebar-bg: #0c3b4a;
+  --sidebar-text: #e4f1ef;
+  --sidebar-hover: #144959;
+  --radius-dentaflow: 10px;
+}
+
+.dark {
+  color-scheme: dark;
+  --bg-primary: #08191f;
+  --surface: #0f2830;
+  --surface-subtle: #143540;
+  --border-color: #1a4452;
+  --text-main: #e8f2f0;
+  --text-muted: #8aa4a0;
+  --primary-marine: #2cc7bf;
+  --accent-teal: #2cc7bf;
+  --coral-promo: #ff7a66;
+  --status-green: #2e9e6b;
+  --status-amber: #e0a100;
+  --status-red: #d64545;
+  --sidebar-bg: #091c23;
+  --sidebar-text: #e8f2f0;
+  --sidebar-hover: #13333f;
+}
+
+body {
+  margin: 0;
+  min-height: 100vh;
+  background-color: var(--bg-primary);
+  color: var(--text-main);
+  font-family: var(--font-body);
+}
+
+h1,
+h2,
+h3,
+h4,
+.font-display {
+  font-family: var(--font-display);
+}
+
+.font-mono,
+.tabular-nums,
+code,
+kbd {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+}
+
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: rgba(18, 166, 160, 0.25);
+  border-radius: 9999px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(18, 166, 160, 0.45);
+}
+
+.print-only {
+  display: none;
+}
+
+@media print {
+  body {
+    background: white !important;
+    color: black !important;
+  }
+
+  .no-print {
+    display: none !important;
+  }
+
+  .print-only {
+    display: block !important;
+  }
+}

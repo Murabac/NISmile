@@ -2,7 +2,7 @@
 
 This file is the map for building DentaFlow. The product spec is `DentaFlow-Project-Plan-v2.md`. The look and screen behavior come from `Design Ref/`. Logos live in `Brand/`.
 
-**Current step:** Phase 0, step 3 — theme tokens, fonts, dark mode, logo, and print hooks. Supabase credentials are in `app/.env.local` (gitignored). Do not copy keys into source or docs. Do not invent the VAT percentage, loyalty rates, a MyCash account number, or WhatsApp credentials.
+**Current step:** Phase 1, step 10 (stock alerts) done. Next is step 11 (transfers). Sample seed: `supabase/seed/20261014032000_seed_stock_alerts_sample.sql`. **Convention:** every build step includes sample seed SQL for new data only, and skips domains that already have seed data. Step 6 stays parallel. Credentials stay in `app/.env.local`. Do not invent the VAT percentage, loyalty rates, a MyCash account number, or WhatsApp credentials.
 
 ## What this repo is
 
@@ -67,7 +67,7 @@ Copy these tokens from `Design Ref/src/index.css`.
 - **Radius:** 10px.
 - **Dark mode:** the prototype has it. Keep it. Toggle on `<html class="dark">`.
 - **Direction:** the staff app stays left-to-right. Do not set `dir="rtl"` and do not build a mirrored layout.
-- **Logo:** tooth silhouette with a teal wave through the lower half, then "Denta" (weight 800) + "Flow" (weight 400). Use `Brand/` assets in the real app. The inline SVG in `Design Ref/src/components/common/Logo.tsx` is the in-app version.
+- **Staff logo:** `Brand/dentaflow-logo.svg` for the wordmark and `Brand/dentaflow-icon.svg` for the app icon and favicon. Do not redraw the tooth from `Design Ref`, and do not use `Brand/nismile-logo.jpg` in the staff app.
 - **Shell:** fixed marine sidebar (`lg:ms-64` is fine as spacing from the sidebar), header with branch switcher, dark toggle, notification count. No language switcher. Mobile sidebar is a drawer. Content max width `max-w-7xl`.
 - **Screens and nav order** match `Design Ref/src/components/common/Sidebar.tsx`: Dashboard, Point of Sale (highlighted), Stock, Transfers, Purchases, Services, Customers, Appointments, Promotions (coral), WhatsApp, Reports, Import, Settings.
 - **English labels** are written in the components. `Design Ref/src/i18n/translations.ts` is not the app catalog. Somali and Arabic strings belong on WhatsApp templates.
@@ -132,17 +132,17 @@ Work in order. Finish a step before starting the next one inside the same phase.
 
 1. **Questions.** Close the open questions below, or explicitly mark one as "decide later in Settings."
 2. **App skeleton.** Done. `app/` is Vite, React, TypeScript, and Tailwind 4. `Design Ref/` is untouched. English UI only.
-3. **Theme.** Tokens, fonts, dark mode, logo, 10px radius, print stylesheet hooks. Left-to-right layout. No language switcher.
-4. **Database.** Existing Supabase project `iwnswhnoxbvgyqljfvel`. Client reads `VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY` from `app/.env.local`. The service role key stays server-only and is never prefixed with `VITE_`. `dental` schema: `branches` (seed one), `profiles`, `user_branches`, RLS helpers. Customers are branch-owned and store a WhatsApp language of `so` or `ar`. Auth: email login, role on the profile.
-5. **Shell.** Login, sidebar, header, branch switcher, role-gated navigation. Empty screen routes for the 13 screens. No demo role switcher and no language switcher.
+3. **Theme.** Done. Tokens, fonts, dark mode, logo, 10px radius, and print hooks are in `app/`. Left-to-right layout. No language switcher.
+4. **Database.** Done. `dental` is exposed on project `iwnswhnoxbvgyqljfvel`. One branch is seeded. `profiles`, `user_branches`, and `customers` exist, with row-level security. The client is `app/src/lib/supabase.ts` and uses only the anon key. The first email signup becomes the owner.
+5. **Shell.** Done. Email sign-in and account creation, marine sidebar, header, branch switcher, and role-gated routes for the 13 screens. Owners can use All branches on Dashboard and Reports. Login has quick buttons for the five demo roles (`owner@nismile.local` through `storekeeper@nismile.local`, password `dentaflow-demo`). Re-seed with `node scripts/seed-demo-users.mjs` from `app/`. No in-app role switcher and no language switcher.
 6. **WhatsApp prep (human, in parallel).** Meta Business account, business verification, dedicated number. Submit Somali and Arabic templates. Not blocking UI work.
 
 ### Phase 1 — Inventory and import (about 2–3 weeks)
 
-7. **Catalog.** Categories, tax rates, items (English name, SKU, barcode, unit, cost, reorder level), price lists with quantity tiers.
-8. **Suppliers and purchases.** Purchase orders per branch, goods receipt with batch number, expiry, and unit cost.
-9. **Ledger.** `stock_batches`, `stock_movements`, FEFO deduction function. UI: items, batches, movements, adjustments.
-10. **Alerts.** Low stock, out of stock, near expiry at 30/60/90 days, on the stock screen and dashboard.
+7. **Catalog.** Done. Shared `categories`, `tax_rates`, `items`, `item_prices`, `services`, and `service_prices`. Stock manages products; Services manages clinical/whitening services; Settings manages tax rates and categories. English names only. No stock quantities or service recipes yet. Sample data from `app/scripts/data/NI_Smile_Products_and_Services_Catalog.xlsx` via `node scripts/seed-nismile-catalog.mjs`.
+8. **Suppliers and purchases.** Done. Migration `20261014020000_dental_purchases.sql`. Sample data: `supabase/seed/20261014021000_seed_purchases_sample.sql` (suppliers, one open PO, one received PO with batches). Does not re-seed catalog/services.
+9. **Ledger.** Done. Tables from purchases; functions `deduct_stock_fefo` and `adjust_stock` in `20261014030000_dental_stock_ledger.sql`. Stock UI shows on-hand qty, batches, movements, and adjustments. Direct client writes to batches/movements revoked. Sample: `supabase/seed/20261014031000_seed_stock_ledger_sample.sql` (extra FEFO gloves batch + one gloves write-off). Does not re-seed catalog/purchases.
+10. **Alerts.** Done. Low stock, out of stock (previously stocked), near expiry at 30/60/90 days on Stock filters + banner and Dashboard KPI/attention list. No new tables; WhatsApp digest stays for later. Sample: `supabase/seed/20261014032000_seed_stock_alerts_sample.sql` (gloves reorder/low, 18d + 50d batches, carton zeroed).
 11. **Transfers.** Draft, send, receive, cancel. Quantity differences become adjustments.
 12. **Stock count.** Count session writes adjustment movements.
 13. **Import.** Items with prices, customers, opening stock. Validation, dry run, confirm, revert.
