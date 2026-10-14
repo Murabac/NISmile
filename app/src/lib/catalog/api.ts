@@ -157,7 +157,8 @@ export async function fetchServices() {
       id, code, name, category_id, description, duration_minutes, tax_rate_id, active, created_at,
       categories ( id, name ),
       tax_rates ( id, name, rate ),
-      service_prices ( id, service_id, price_list, min_qty, price )
+      service_prices ( id, service_id, price_list, min_qty, price ),
+      service_recipes ( id, service_id, item_id, qty, items ( id, sku, name, unit ) )
     `,
     )
     .order('name')
@@ -178,6 +179,25 @@ export async function fetchServices() {
       min_qty: number
       price: number
     }[],
+    service_recipes: ((row as { service_recipes?: unknown[] }).service_recipes ?? []).map((line) => {
+      const recipe = line as {
+        id: string
+        service_id: string
+        item_id: string
+        qty: number
+        items:
+          | { id: string; sku: string; name: string; unit: string }
+          | { id: string; sku: string; name: string; unit: string }[]
+          | null
+      }
+      return {
+        id: recipe.id,
+        service_id: recipe.service_id,
+        item_id: recipe.item_id,
+        qty: Number(recipe.qty),
+        items: asOne(recipe.items),
+      }
+    }),
   }))
 }
 
@@ -198,6 +218,11 @@ export async function saveService(input: ServiceInput, serviceId?: string) {
     if (error) throw error
     const { error: deleteError } = await supabase.from('service_prices').delete().eq('service_id', id)
     if (deleteError) throw deleteError
+    const { error: recipeDeleteError } = await supabase
+      .from('service_recipes')
+      .delete()
+      .eq('service_id', id)
+    if (recipeDeleteError) throw recipeDeleteError
   } else {
     const { data, error } = await supabase.from('services').insert(payload).select('id').single()
     if (error) throw error
@@ -216,5 +241,32 @@ export async function saveService(input: ServiceInput, serviceId?: string) {
     if (priceError) throw priceError
   }
 
+  const recipes = input.recipes.filter((line) => line.item_id && Number(line.qty) > 0)
+  if (recipes.length > 0) {
+    const { error: recipeError } = await supabase.from('service_recipes').insert(
+      recipes.map((line) => ({
+        service_id: id!,
+        item_id: line.item_id,
+        qty: Number(line.qty),
+      })),
+    )
+    if (recipeError) throw recipeError
+  }
+
   return id
+}
+
+export async function applyServiceRecipe(
+  branchId: string,
+  serviceId: string,
+  refType: string | null = 'manual',
+  refId: string | null = null,
+) {
+  const { error } = await supabase.rpc('apply_service_recipe', {
+    p_branch_id: branchId,
+    p_service_id: serviceId,
+    p_ref_type: refType,
+    p_ref_id: refId,
+  })
+  if (error) throw error
 }

@@ -133,4 +133,49 @@ kbd {
   .print-only {
     display: block !important;
   }
+
+  /* Hide app chrome; show only the open document. */
+  body * {
+    visibility: hidden;
+  }
+
+  .print-document,
+  .print-document * {
+    visibility: visible;
+  }
+
+  .print-document {
+    position: absolute;
+    top: 0;
+    left: 0;
+    margin: 0;
+    border: none !important;
+    box-shadow: none !important;
+    border-radius: 0 !important;
+  }
+
+  .print-thermal-80 {
+    width: 80mm;
+    max-width: 80mm;
+    left: 50%;
+    transform: translateX(-50%);
+  }
+
+  .print-thermal-58 {
+    width: 58mm;
+    max-width: 58mm;
+    left: 50%;
+    transform: translateX(-50%);
+  }
+
+  .print-a4 {
+    width: 190mm;
+    max-width: 190mm;
+    left: 50%;
+    transform: translateX(-50%);
+  }
+
+  @page {
+    margin: 10mm;
+  }
 }

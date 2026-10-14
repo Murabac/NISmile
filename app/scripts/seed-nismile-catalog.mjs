@@ -75,13 +75,17 @@ function unitFor(type, sku) {
 
 function pricesFor(base, type) {
   const basePrice = Number(base)
+  // Clinical services: patient (retail) price only — no wholesale list.
+  if (type === 'Service') {
+    return [{ price_list: 'retail', min_qty: 1, price: roundMoney(basePrice) }]
+  }
   if (type === 'Wholesale') {
     return [
       { price_list: 'wholesale', min_qty: 1, price: roundMoney(basePrice) },
       { price_list: 'retail', min_qty: 1, price: roundMoney(basePrice) },
     ]
   }
-  // Products, packages, and services: base + 10%/20% quantity tiers from the sheet.
+  // Products and packages: retail + wholesale quantity tiers.
   return [
     { price_list: 'retail', min_qty: 1, price: roundMoney(basePrice) },
     { price_list: 'retail', min_qty: 10, price: roundMoney(basePrice * 0.9) },

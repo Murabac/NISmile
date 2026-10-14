@@ -2,7 +2,7 @@
 
 This file is the map for building DentaFlow. The product spec is `DentaFlow-Project-Plan-v2.md`. The look and screen behavior come from `Design Ref/`. Logos live in `Brand/`.
 
-**Current step:** Phase 1, step 10 (stock alerts) done. Next is step 11 (transfers). Sample seed: `supabase/seed/20261014032000_seed_stock_alerts_sample.sql`. **Convention:** every build step includes sample seed SQL for new data only, and skips domains that already have seed data. Step 6 stays parallel. Credentials stay in `app/.env.local`. Do not invent the VAT percentage, loyalty rates, a MyCash account number, or WhatsApp credentials.
+**Current step:** Phase 3, step 20 (Notification queue). Appointments seed if needed: `node scripts/seed-appointments.mjs` from `app/` (after applying `20261014110000_dental_appointments.sql`). **Convention:** every build step includes sample seed SQL for new data only, and skips domains that already have seed data. Step 6 stays parallel. Credentials stay in `app/.env.local`. Do not invent the VAT percentage, loyalty rates, a MyCash account number, or WhatsApp credentials.
 
 ## What this repo is
 
@@ -69,7 +69,7 @@ Copy these tokens from `Design Ref/src/index.css`.
 - **Direction:** the staff app stays left-to-right. Do not set `dir="rtl"` and do not build a mirrored layout.
 - **Staff logo:** `Brand/dentaflow-logo.svg` for the wordmark and `Brand/dentaflow-icon.svg` for the app icon and favicon. Do not redraw the tooth from `Design Ref`, and do not use `Brand/nismile-logo.jpg` in the staff app.
 - **Shell:** fixed marine sidebar (`lg:ms-64` is fine as spacing from the sidebar), header with branch switcher, dark toggle, notification count. No language switcher. Mobile sidebar is a drawer. Content max width `max-w-7xl`.
-- **Screens and nav order** match `Design Ref/src/components/common/Sidebar.tsx`: Dashboard, Point of Sale (highlighted), Stock, Transfers, Purchases, Services, Customers, Appointments, Promotions (coral), WhatsApp, Reports, Import, Settings.
+- **Screens and nav order** match `Design Ref/src/components/common/Sidebar.tsx`, plus **Sales** (branch sale history for documents/returns) after Point of Sale: Dashboard, Point of Sale (highlighted), Sales, Stock, Transfers, Purchases, Services, Customers, Appointments, Promotions (coral), WhatsApp, Reports, Import, Settings.
 - **English labels** are written in the components. `Design Ref/src/i18n/translations.ts` is not the app catalog. Somali and Arabic strings belong on WhatsApp templates.
 
 ### Prototype behavior to drop
@@ -99,7 +99,10 @@ Schema outline is section 4 of the plan. These rules are easy to get wrong:
 - Transfer statuses: `draft → in_transit → received`, or `cancelled`. Stock leaves the source when sent and enters the destination when received. In-transit stock stays visible.
 - Appointment statuses: `scheduled`, `confirmed`, `completed`, `cancelled`, `no_show`. Completing an appointment creates the sale and deducts the service recipe at that branch.
 - Checkout tenders: Cash, Zaad, eDahab, MyCash (Amal Bank). Print the merchant or account numbers once the clinic supplies them. Do not treat MyCash as cash, and do not add Telesom or Dahabshiil unless asked.
-- Imports: template → upload → row validation → dry run → confirm, through `import_batches` / `import_rows`. Opening stock needs a batch and expiry, or a flagged legacy batch. Revert is allowed only while no sale references the imported rows.
+- Imports: Excel (.xlsx) template → upload → row validation → dry run → confirm, through `import_batches` / `import_rows`. Opening stock needs a batch and expiry, or a flagged legacy batch. Revert is allowed only while no sale references the imported rows.
+- Services: optional `service_recipes` (item + qty). Completing a service calls `apply_service_recipe`, which deducts each line with FEFO `service_usage`. **Services are patient-priced only** (retail `service_prices`). No wholesale list on services — wholesale stays on items.
+- Checkout: `checkout_sale` writes `sales` / `sale_lines` / `payments` in one transaction, then FEFO `sale_out` for items and `apply_service_recipe` per service unit. VAT from each line’s tax rate (0 if none). Tenders: Cash, Zaad, eDahab, MyCash. Partial payment → status `partial`. Promotions/points/documents later.
+- Wholesale: on-account is unpaid AR (not a fifth tender). Unpaid wholesale sales need `due_date` and a positive `credit_limit`. `customer_ar_balance` + `apply_customer_payment` settle open invoices FIFO.
 - Phone numbers are stored in international form (`+252…`).
 - `customers.language` is the WhatsApp language: `so` or `ar`. It does not change the staff UI.
 - Item, service, and promotion names in the app are English. Somali and Arabic wording is stored on the WhatsApp template or campaign message, not as a second set of screen labels.
@@ -117,7 +120,7 @@ Edge Functions
   send-whatsapp     queue worker (pg_cron)
   whatsapp-webhook  delivery status and replies (1 = confirm, 2 = cancel, opt-out)
   campaign-builder  resolve audience, enqueue
-  import-processor  validate and load CSV
+  import-processor  validate and load Excel
         │
 WhatsApp Cloud API
 ```
@@ -143,21 +146,21 @@ Work in order. Finish a step before starting the next one inside the same phase.
 8. **Suppliers and purchases.** Done. Migration `20261014020000_dental_purchases.sql`. Sample data: `supabase/seed/20261014021000_seed_purchases_sample.sql` (suppliers, one open PO, one received PO with batches). Does not re-seed catalog/services.
 9. **Ledger.** Done. Tables from purchases; functions `deduct_stock_fefo` and `adjust_stock` in `20261014030000_dental_stock_ledger.sql`. Stock UI shows on-hand qty, batches, movements, and adjustments. Direct client writes to batches/movements revoked. Sample: `supabase/seed/20261014031000_seed_stock_ledger_sample.sql` (extra FEFO gloves batch + one gloves write-off). Does not re-seed catalog/purchases.
 10. **Alerts.** Done. Low stock, out of stock (previously stocked), near expiry at 30/60/90 days on Stock filters + banner and Dashboard KPI/attention list. No new tables; WhatsApp digest stays for later. Sample: `supabase/seed/20261014032000_seed_stock_alerts_sample.sql` (gloves reorder/low, 18d + 50d batches, carton zeroed).
-11. **Transfers.** Draft, send, receive, cancel. Quantity differences become adjustments.
-12. **Stock count.** Count session writes adjustment movements.
-13. **Import.** Items with prices, customers, opening stock. Validation, dry run, confirm, revert.
+11. **Transfers.** Done. Migration `20261014040000_dental_transfers.sql`: `stock_transfers`, lines, allocations; RPCs create/send/receive/cancel. Send uses FEFO (`transfer_out`); receive creates destination batches (`transfer_in`); short receive writes an adjustment. Transfers UI on `/transfers`. Sample seed adds demo branch **Hargeisa North**, one draft and one in-transit gloves transfer. Does not re-seed catalog/purchases.
+12. **Stock count.** Done. Migration `20261014050000_dental_stock_counts.sql` plus all-active-items snapshot. Stock UI: **Stock count** drawer with Restart. Opening batches for unstocked items seeded. Sample variance count seeded.
+13. **Import.** Done once migration + seed are applied. Migration `20261014060000_dental_imports.sql`: `import_batches` / `import_rows`; create → validate → dry run → confirm → revert. Types: items (shared), customers, opening stock (branch). UI at `/import` with Excel (.xlsx) templates and uploads. Sample: confirmed customer import (`20261014061000_seed_imports_sample.sql`).
 
 ### Phase 2 — Sales and VAT (about 2–3 weeks)
 
-14. **Services.** Price, duration, VAT, optional recipe. Completing a service deducts the recipe.
-15. **POS.** Branch from the session, customer or walk-in at that branch, items and services, best promotion, VAT added on top, partial payment. Tenders: Cash, Zaad, eDahab, MyCash.
-16. **Wholesale.** Credit limit, due date, statement, payment against balance.
-17. **Documents.** English thermal receipt, 80 mm default and 58 mm option. English A4 PDF with clinic tax details.
-18. **Returns.** Linked to the original sale, optional restock, points and promotion usage reversed.
+14. **Services.** Done once migration + seed are applied. Migration `20261014070000_dental_service_recipes.sql`: `service_recipes` + `apply_service_recipe` (FEFO `service_usage`). Services UI: list + recipe panel, edit drawer with materials, **Record usage** when a branch is selected. Sample recipes on SRV-001/002/003 + one SRV-002 usage movement (`20261014071000_seed_service_recipes_sample.sql`).
+15. **POS.** Done once migration + seed are applied. Migration `20261014080000_dental_sales.sql`: `sales`, `sale_lines`, `payments`, `checkout_sale`. UI at `/pos` (branch required): catalog, walk-in/customer, cart, tenders, partial OK. Promotions/points/receipts deferred. Sample walk-in sale (`20261014081000_seed_sales_sample.sql`).
+16. **Wholesale.** Done once migration + seed are applied. Migration `20261014090000_dental_wholesale.sql`: `sales.due_date`, extended `checkout_sale`, `customer_ar_balance`, `apply_customer_payment`. POS charge-to-account for wholesale. Customers page at `/customers` with AR, statement (browser print), record payment. Sample wholesale customer + on-account + Zaad settlement (`20261014091000_seed_wholesale_sample.sql`).
+17. **Documents.** Done. English thermal receipt (80 mm default, 58 mm option) and A4 tax invoice from the same sale via `SaleDocumentsModal` + browser print / Save as PDF. Clinic identity from `app/src/lib/clinic.ts` and `Brand/nismile-logo.jpg` in `app/public/`. Wired on POS after checkout and Customers recent sales. WhatsApp PDF send stays for later.
+18. **Returns.** Done once migration + seed are applied. Migration `20261014100000_dental_returns.sql`: `returns` / `return_lines` / `return_refunds`, `process_return` (partial lines, AR credit then tender refunds, optional item restock onto original sale_out batches). UI: Return on POS last-sale banner and Customers recent sales. Points/promotions reverse later when those ledgers exist. Sample: return walk-in item line (`20261014101000_seed_returns_sample.sql` / `node scripts/seed-returns.mjs`).
 
 ### Phase 3 — Appointments and WhatsApp (about 2 weeks)
 
-19. **Patients and calendar.** Per branch and dentist. Status flow from the plan. Preferred WhatsApp language is Somali or Arabic.
+19. **Patients and calendar.** Done once migration + seed are applied. Migration `20261014110000_dental_appointments.sql`: `appointments` + `create_appointment` / `set_appointment_status` / `complete_appointment` (complete → `checkout_sale` for the booked service). UI at `/appointments`: week calendar + list, book drawer (retail patients, dentist, service, so/ar on customer), status actions. Patients stay on Customers (Retail). Sample: Ayaan Abdi + today/tomorrow slots (`20261014111000_seed_appointments_sample.sql` / `node scripts/seed-appointments.mjs`). WhatsApp send is step 20+.
 20. **Queue.** `notification_queue`, `notification_log`, `message_templates` with one Somali version and one Arabic version of each message.
 21. **Utility messages.** Booking confirmation, 24h and 2h reminders, reschedule/cancel, receipt or invoice notice. Body text is Somali or Arabic. Attached PDFs stay English.
 22. **Webhook.** Delivery status, reply 1/2, opt-out. Reply instructions inside the template are in that template's language.

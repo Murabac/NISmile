@@ -9,6 +9,7 @@ import {
   MessageSquare,
   Percent,
   Settings,
+  Receipt,
   ShoppingCart,
   Sparkles,
   Truck,
@@ -51,6 +52,13 @@ export const screens: Screen[] = [
     icon: ShoppingCart,
     roles: ['owner', 'branch_manager', 'receptionist', 'dentist'],
     highlight: true,
+  },
+  {
+    id: 'sales',
+    label: 'Sales',
+    path: '/sales',
+    icon: Receipt,
+    roles: ['owner', 'branch_manager', 'receptionist', 'dentist'],
   },
   {
     id: 'stock',

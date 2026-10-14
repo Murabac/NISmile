@@ -59,6 +59,19 @@ export type ItemInput = {
   prices: PriceTierInput[]
 }
 
+export type ServiceRecipeLine = {
+  id: string
+  service_id: string
+  item_id: string
+  qty: number
+  items: Pick<CatalogItem, 'id' | 'sku' | 'name' | 'unit'> | null
+}
+
+export type RecipeLineInput = {
+  item_id: string
+  qty: number
+}
+
 export type CatalogService = {
   id: string
   code: string
@@ -78,6 +91,7 @@ export type CatalogService = {
     min_qty: number
     price: number
   }[]
+  service_recipes: ServiceRecipeLine[]
 }
 
 export type ServiceInput = {
@@ -89,4 +103,5 @@ export type ServiceInput = {
   tax_rate_id: string | null
   active: boolean
   prices: PriceTierInput[]
+  recipes: RecipeLineInput[]
 }

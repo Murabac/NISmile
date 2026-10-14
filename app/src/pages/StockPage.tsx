@@ -1,8 +1,9 @@
 import { useMemo, useState, type FormEvent } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { History, Layers, Plus, Search, SlidersHorizontal } from 'lucide-react'
+import { ClipboardList, History, Layers, Plus, Search, SlidersHorizontal } from 'lucide-react'
 import { Drawer } from '../components/Drawer.tsx'
 import { Modal } from '../components/Modal.tsx'
+import { StockCountDrawer } from '../components/StockCountDrawer.tsx'
 import { useAuth } from '../lib/auth.tsx'
 import {
   basePrice,
@@ -84,6 +85,7 @@ export function StockPage() {
   const [editing, setEditing] = useState<CatalogItem | null>(null)
   const [detailItem, setDetailItem] = useState<CatalogItem | null>(null)
   const [adjustOpen, setAdjustOpen] = useState(false)
+  const [countOpen, setCountOpen] = useState(false)
   const [adjustReason, setAdjustReason] = useState<AdjustReason>('Count reconciliation')
   const [adjustQty, setAdjustQty] = useState('0')
   const [adjustNotes, setAdjustNotes] = useState('')
@@ -311,19 +313,29 @@ export function StockPage() {
         </div>
         <div className="flex flex-wrap gap-2">
           {canAdjust ? (
-            <button
-              type="button"
-              onClick={() => {
-                if (!detailItem && filtered[0]) openDetail(filtered[0])
-                setAdjustOpen(true)
-                setFormError(null)
-              }}
-              disabled={!detailItem && filtered.length === 0}
-              className="inline-flex h-10 items-center gap-2 rounded-dentaflow bg-marine px-4 text-sm font-bold text-white disabled:opacity-50"
-            >
-              <SlidersHorizontal className="h-4 w-4" />
-              Adjust stock
-            </button>
+            <>
+              <button
+                type="button"
+                onClick={() => setCountOpen(true)}
+                className="inline-flex h-10 items-center gap-2 rounded-dentaflow border border-line bg-surface px-4 text-sm font-bold"
+              >
+                <ClipboardList className="h-4 w-4" />
+                Stock count
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  if (!detailItem && filtered[0]) openDetail(filtered[0])
+                  setAdjustOpen(true)
+                  setFormError(null)
+                }}
+                disabled={!detailItem && filtered.length === 0}
+                className="inline-flex h-10 items-center gap-2 rounded-dentaflow bg-marine px-4 text-sm font-bold text-white disabled:opacity-50"
+              >
+                <SlidersHorizontal className="h-4 w-4" />
+                Adjust stock
+              </button>
+            </>
           ) : null}
           <button
             type="button"
@@ -729,6 +741,12 @@ export function StockPage() {
           {formError ? <p className="text-sm text-status-red">{formError}</p> : null}
         </div>
       </Modal>
+
+      <StockCountDrawer
+        open={countOpen}
+        branchId={branchId}
+        onClose={() => setCountOpen(false)}
+      />
 
       <Drawer
         open={catalogOpen}
