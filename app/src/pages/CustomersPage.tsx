@@ -68,20 +68,12 @@ export function CustomersPage() {
   const [creditLimit, setCreditLimit] = useState('1000')
   const [notes, setNotes] = useState('')
 
-  if (branchId === 'all') {
-    return (
-      <section className="rounded-dentaflow border border-line bg-surface p-6">
-        <h1 className="text-3xl font-semibold">Customers</h1>
-        <p className="mt-3 max-w-xl text-muted">
-          Choose one branch in the header. Customers belong to a single branch.
-        </p>
-      </section>
-    )
-  }
+  const branchReady = branchId !== 'all'
 
   const customersQuery = useQuery({
     queryKey: ['customers', branchId],
     queryFn: () => fetchCustomers(branchId),
+    enabled: branchReady,
   })
 
   const customers = customersQuery.data ?? []
@@ -90,13 +82,13 @@ export function CustomersPage() {
   const statementQuery = useQuery({
     queryKey: ['customer_statement', selected?.id],
     queryFn: () => fetchCustomerStatement(selected!.id),
-    enabled: Boolean(selected?.id),
+    enabled: branchReady && Boolean(selected?.id),
   })
 
   const salesQuery = useQuery({
     queryKey: ['customer_sales', selected?.id],
     queryFn: () => fetchCustomerSales(selected!.id),
-    enabled: Boolean(selected?.id),
+    enabled: branchReady && Boolean(selected?.id),
   })
 
   const filtered = useMemo(() => {
@@ -204,6 +196,17 @@ export function CustomersPage() {
         customerType === 'wholesale' && creditLimit !== '' ? Number(creditLimit) : null,
       notes: notes || null,
     })
+  }
+
+  if (!branchReady) {
+    return (
+      <section className="rounded-dentaflow border border-line bg-surface p-6">
+        <h1 className="text-3xl font-semibold">Customers</h1>
+        <p className="mt-3 max-w-xl text-muted">
+          Choose one branch in the header. Customers belong to a single branch.
+        </p>
+      </section>
+    )
   }
 
   return (

@@ -1,12 +1,11 @@
-import iconUrl from '../../../Brand/dentaflow-icon.svg'
-import logoUrl from '../../../Brand/dentaflow-logo.svg'
+import { CLINIC_LOGO_SRC, CLINIC_MARK_NAME } from '../lib/clinic.ts'
 
 type LogoSize = 'sm' | 'md' | 'lg'
 
 const heights: Record<LogoSize, number> = {
-  sm: 28,
-  md: 36,
-  lg: 48,
+  sm: 32,
+  md: 40,
+  lg: 52,
 }
 
 type LogoProps = {
@@ -15,26 +14,21 @@ type LogoProps = {
   className?: string
 }
 
+/** Clinic mark for staff chrome. DentaFlow wordmark/icon hidden for now. */
 export function Logo({ size = 'md', iconOnly = false, className = '' }: LogoProps) {
   const height = heights[size]
 
-  const image = (
-    <img
-      src={iconOnly ? iconUrl : logoUrl}
-      alt="DentaFlow"
-      height={height}
-      className={`w-auto ${iconOnly ? className : ''}`}
-      style={{ height }}
-    />
-  )
-
-  if (iconOnly) return image
-
   return (
     <span
-      className={`inline-flex items-center rounded-dentaflow bg-enamel px-2.5 py-1.5 ${className}`}
+      className={`inline-flex items-center ${iconOnly ? '' : 'rounded-dentaflow bg-white px-2 py-1'} ${className}`}
     >
-      {image}
+      <img
+        src={CLINIC_LOGO_SRC}
+        alt={CLINIC_MARK_NAME}
+        height={height}
+        className="w-auto object-contain"
+        style={{ height }}
+      />
     </span>
   )
 }

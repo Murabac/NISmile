@@ -81,30 +81,32 @@ export function PosPage() {
     setRedeemLoyalty(false)
   }
 
-  if (branchId === 'all') {
-    return (
-      <section className="rounded-dentaflow border border-line bg-surface p-6">
-        <h1 className="text-3xl font-semibold">Point of Sale</h1>
-        <p className="mt-3 max-w-xl text-muted">
-          Choose one branch in the header before ringing up a sale.
-        </p>
-      </section>
-    )
-  }
+  const branchReady = branchId !== 'all'
 
-  const itemsQuery = useQuery({ queryKey: ['items'], queryFn: fetchItems })
-  const servicesQuery = useQuery({ queryKey: ['services'], queryFn: fetchServices })
+  const itemsQuery = useQuery({
+    queryKey: ['items'],
+    queryFn: fetchItems,
+    enabled: branchReady,
+  })
+  const servicesQuery = useQuery({
+    queryKey: ['services'],
+    queryFn: fetchServices,
+    enabled: branchReady,
+  })
   const customersQuery = useQuery({
     queryKey: ['pos_customers', branchId],
     queryFn: () => fetchBranchCustomers(branchId),
+    enabled: branchReady,
   })
   const stockQuery = useQuery({
     queryKey: ['stock_summaries', branchId],
     queryFn: () => fetchBranchStockSummaries(branchId),
+    enabled: branchReady,
   })
   const settingsQuery = useQuery({
     queryKey: ['clinic_settings'],
     queryFn: fetchClinicSettings,
+    enabled: branchReady,
   })
 
   const items = (itemsQuery.data ?? []).filter((row) => row.active) as CatalogItem[]
@@ -124,7 +126,7 @@ export function PosPage() {
   const arQuery = useQuery({
     queryKey: ['customer_ar', selectedCustomer?.id],
     queryFn: () => customerArBalance(selectedCustomer!.id),
-    enabled: Boolean(selectedCustomer?.id && isWholesale),
+    enabled: branchReady && Boolean(selectedCustomer?.id && isWholesale),
   })
   const currentAr = arQuery.data ?? 0
 
@@ -189,7 +191,7 @@ export function PosPage() {
         customerId: customerId === 'walk-in' ? null : customerId,
         lines: cartLinesPayload,
       }),
-    enabled: cart.length > 0,
+    enabled: branchReady && cart.length > 0,
   })
 
   const promoName = promoQuery.data?.name ?? promoQuery.data?.code ?? null
@@ -471,6 +473,17 @@ export function PosPage() {
     )
     const need = round2(Math.max(0, cartTotals.total - others))
     setTenders((current) => ({ ...current, [tender]: need > 0 ? String(need) : '' }))
+  }
+
+  if (!branchReady) {
+    return (
+      <section className="rounded-dentaflow border border-line bg-surface p-6">
+        <h1 className="text-3xl font-semibold">Point of Sale</h1>
+        <p className="mt-3 max-w-xl text-muted">
+          Choose one branch in the header before ringing up a sale.
+        </p>
+      </section>
+    )
   }
 
   return (

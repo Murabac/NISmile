@@ -28,12 +28,22 @@ export function Sidebar({ mobileOpen, onClose }: SidebarProps) {
           mobileOpen ? 'translate-x-0' : '-translate-x-full'
         }`}
       >
-        <div className="flex h-16 shrink-0 items-center justify-between border-b border-[#144959] px-4">
-          <Logo size="sm" />
+        <div className="flex h-16 shrink-0 items-center justify-between gap-2 border-b border-[#144959] px-3">
+          <div className="flex min-w-0 items-center gap-2.5">
+            <Logo size="sm" />
+            <div className="min-w-0 leading-tight">
+              <p className="font-display text-[15px] font-extrabold tracking-tight text-white">
+                N.I SMILE
+              </p>
+              <p className="truncate text-[10px] font-medium tracking-[0.04em] text-[#A6C2C7] uppercase">
+                Oral care & Teeth whitening
+              </p>
+            </div>
+          </div>
           <button
             type="button"
             onClick={onClose}
-            className="rounded-dentaflow p-1.5 text-sidebar-text lg:hidden"
+            className="shrink-0 rounded-dentaflow p-1.5 text-sidebar-text lg:hidden"
             aria-label="Close navigation"
           >
             <X className="h-5 w-5" />
@@ -73,7 +83,7 @@ export function Sidebar({ mobileOpen, onClose }: SidebarProps) {
         <div className="shrink-0 border-t border-[#144959] bg-[#092B36] p-3 text-[11px] text-[#A6C2C7]">
           <span className="flex items-center gap-1.5">
             <span className="h-2 w-2 rounded-full bg-status-green" />
-            N.I SMILE
+            System online
           </span>
         </div>
       </aside>

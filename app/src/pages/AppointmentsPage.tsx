@@ -201,19 +201,9 @@ export function AppointmentsPage() {
     onError: (err: Error) => setError(err.message),
   })
 
-  if (branchId === 'all') {
-    return (
-      <section className="rounded-dentaflow border border-line bg-surface p-6">
-        <h1 className="text-3xl font-semibold">Appointments</h1>
-        <p className="mt-3 max-w-xl text-muted">
-          Choose one branch in the header to manage the patient calendar.
-        </p>
-      </section>
-    )
-  }
-
   const addPatientMutation = useMutation({
     mutationFn: async () => {
+      if (branchId === 'all') throw new Error('Choose a branch first')
       if (!newPatientName.trim()) throw new Error('Patient name is required')
       return saveCustomer(branchId, {
         name: newPatientName.trim(),
@@ -240,6 +230,7 @@ export function AppointmentsPage() {
 
   const addDentistMutation = useMutation({
     mutationFn: async () => {
+      if (branchId === 'all') throw new Error('Choose a branch first')
       if (!newDentistName.trim()) throw new Error('Dentist name is required')
       if (!newDentistEmail.trim()) throw new Error('Dentist email is required')
       return createBranchDentist({
@@ -278,6 +269,17 @@ export function AppointmentsPage() {
     setNewDentistEmail('')
     setNewDentistPassword('')
     setBookingOpen(true)
+  }
+
+  if (branchId === 'all') {
+    return (
+      <section className="rounded-dentaflow border border-line bg-surface p-6">
+        <h1 className="text-3xl font-semibold">Appointments</h1>
+        <p className="mt-3 max-w-xl text-muted">
+          Choose one branch in the header to manage the patient calendar.
+        </p>
+      </section>
+    )
   }
 
   return (

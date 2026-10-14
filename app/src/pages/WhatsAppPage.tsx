@@ -614,7 +614,7 @@ export function WhatsAppPage() {
                 <X className="h-4 w-4" />
               </button>
             </div>
-            <pre className="whitespace-pre-wrap rounded-dentaflow bg-canvas p-3 text-xs leading-relaxed text-ink">
+            <pre className="whitespace-pre-wrap rounded-dentaflow border border-line bg-canvas p-3 text-xs leading-relaxed text-main">
               {renderTemplatePreview(preview.body_text, {
                 '1': 'Ayaan Abdi',
                 '2': 'N.I SMILE',

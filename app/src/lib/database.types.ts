@@ -1121,6 +1121,7 @@ export type Database = {
           loyalty_usd_per_point: number | null
           loyalty_min_redeem_points: number | null
           loyalty_expire_days: number | null
+          go_live: Record<string, unknown>
           updated_by: string | null
           updated_at: string
           created_at: string
@@ -1132,6 +1133,7 @@ export type Database = {
           loyalty_usd_per_point?: number | null
           loyalty_min_redeem_points?: number | null
           loyalty_expire_days?: number | null
+          go_live?: Record<string, unknown>
           updated_by?: string | null
           updated_at?: string
           created_at?: string
@@ -1142,6 +1144,7 @@ export type Database = {
           loyalty_usd_per_point?: number | null
           loyalty_min_redeem_points?: number | null
           loyalty_expire_days?: number | null
+          go_live?: Record<string, unknown>
           updated_by?: string | null
           updated_at?: string
         }
@@ -1339,6 +1342,27 @@ export type Database = {
       }
       campaign_stats: {
         Args: { p_campaign_id: string }
+        Returns: unknown
+      }
+      run_report: {
+        Args: {
+          p_report_type: string
+          p_branch_id?: string | null
+          p_period?: string
+        }
+        Returns: unknown
+      }
+      dashboard_summary: {
+        Args: { p_branch_id?: string | null }
+        Returns: unknown
+      }
+      go_live_status: { Args: Record<string, never>; Returns: unknown }
+      update_go_live_checklist: {
+        Args: { p_checklist: unknown }
+        Returns: unknown
+      }
+      delete_branch: {
+        Args: { p_branch_id: string }
         Returns: unknown
       }
       customer_ar_balance: {

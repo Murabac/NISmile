@@ -47,11 +47,21 @@ export function LoginPage() {
     <main className="flex min-h-screen items-center justify-center bg-canvas px-4 py-8 text-main">
       <div className="w-full max-w-md rounded-dentaflow border border-line bg-surface p-6">
         <div className="mb-6 flex items-center justify-between gap-3">
-          <Logo size="md" />
+          <div className="flex min-w-0 items-center gap-2.5">
+            <Logo size="md" />
+            <div className="min-w-0 leading-tight">
+              <p className="font-display text-base font-extrabold tracking-tight text-marine dark:text-[#E8F2F0]">
+                N.I SMILE
+              </p>
+              <p className="truncate text-[10px] font-medium tracking-[0.04em] text-muted uppercase">
+                Oral care & Teeth whitening
+              </p>
+            </div>
+          </div>
           <button
             type="button"
             onClick={toggle}
-            className="rounded-dentaflow border border-line px-3 py-1.5 text-xs font-semibold"
+            className="shrink-0 rounded-dentaflow border border-line px-3 py-1.5 text-xs font-semibold"
           >
             {isDark ? 'Light' : 'Dark'}
           </button>

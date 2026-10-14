@@ -29,6 +29,7 @@ type AuthValue = {
   branches: Branch[]
   branchId: string | 'all'
   setBranchId: (id: string | 'all') => void
+  refreshBranches: () => Promise<void>
   signIn: (email: string, password: string) => Promise<string | null>
   signUp: (name: string, email: string, password: string) => Promise<string | null>
   signOut: () => Promise<void>
@@ -65,6 +66,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [])
 
   const userId = session?.user.id ?? null
+
+  async function loadBranches() {
+    const { data, error } = await supabase
+      .from('branches')
+      .select('id, name, address')
+      .eq('active', true)
+      .order('name')
+    if (error) throw error
+    setBranches(data ?? [])
+  }
 
   useEffect(() => {
     if (!userId) {
@@ -132,6 +143,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         if (id === 'all' && profile?.role !== 'owner') return
         if (id === 'all' && branches.length <= 1) return
         setBranchIdState(id)
+      },
+      refreshBranches: async () => {
+        await loadBranches()
       },
       signIn: async (email, password) => {
         const { error } = await supabase.auth.signInWithPassword({ email, password })

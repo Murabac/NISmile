@@ -15,7 +15,7 @@ export function ScreenPage() {
       <p className="text-sm font-medium text-muted">
         {branchId === 'all' ? 'All branches' : (branch?.name ?? 'No branch')}
       </p>
-      <h1 className="mt-1 text-3xl font-semibold">{screen?.label ?? 'DentaFlow'}</h1>
+      <h1 className="mt-1 text-3xl font-semibold">{screen?.label ?? 'N.I SMILE'}</h1>
       {unassigned ? (
         <p className="mt-3 max-w-xl text-muted">An owner has not assigned you to a branch yet.</p>
       ) : needsBranch ? (

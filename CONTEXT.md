@@ -2,7 +2,7 @@
 
 This file is the map for building DentaFlow. The product spec is `DentaFlow-Project-Plan-v2.md`. The look and screen behavior come from `Design Ref/`. Logos live in `Brand/`.
 
-**Current step:** Phase 5, step 26 (Reports). Step 25 campaigns done: apply `20261014190000_dental_campaigns.sql`, seed `20261014191000_seed_campaigns_sample.sql` / `node scripts/seed-campaigns.mjs` from `app/`. Marketing templates `promotion_announcement` / `promotion_ending_soon` (so/ar/en). Owner previews opt-in audience on `/promotions` → enqueues per customer language into `notification_queue`; `/whatsapp` Campaigns tab shows stats. Process due still sends via Meta. **Convention:** every build step includes sample seed SQL for new data only, and skips domains that already have seed data. Step 6 stays parallel. Credentials stay in Edge secrets / `app/.env.local`. Do not invent the VAT percentage, loyalty rates, a MyCash account number, or WhatsApp credentials.
+**Current step:** Phase 5 complete; owner branch admin added. Apply `20261015010000_dental_branch_admin.sql` for `delete_branch`. Settings → Branches: create, edit, activate/deactivate, delete (hard delete if unused; otherwise deactivate). Reports/dashboard still from step 26–28. **Convention:** every build step includes sample seed SQL for new data only, and skips domains that already have seed data. Step 6 stays parallel. Credentials stay in Edge secrets / `app/.env.local`. Do not invent the VAT percentage, loyalty rates, a MyCash account number, or WhatsApp credentials.
 
 ## What this repo is
 
@@ -24,7 +24,7 @@ DentaFlow is a multi-branch dental clinic system: inventory, retail and wholesal
 - **Currency:** USD only. Store money as `numeric(12,2)`. No exchange rates.
 - **Staff app language:** English only. No language switcher, no translated screens, no RTL layout. Section 3.8 of the plan and the prototype's language switcher are superseded.
 - **WhatsApp languages:** message content is **Somali, Arabic, and English** (`so` / `ar` / `en`). Each customer has a preferred message language. The sender picks that template. Staff UI stays English-only (no screen translation / no RTL switcher).
-- **Branches:** The schema supports many branches, and Settings can add more later. **Seed one branch** for go-live. Owners can view all branches once more exist. Everyone else is limited to their branches.
+- **Branches:** Schema supports many branches. Owner manages them in **Settings → Branches** (create, edit, deactivate, delete). **Seed one branch** for go-live. Owners can view all branches once more exist. Everyone else is limited to their branches.
 - **Shared across branches:** items, services, price lists, tax rates.
 - **Per branch:** customers (patients and wholesale), stock, sales, appointments, purchases, cash. A customer record belongs to one branch.
 - **Wholesale:** staff enter orders. Buyer subtypes: clinic, pharmacy/shop, lab, individual dentist. Credit limit, due date, statement.
@@ -174,9 +174,9 @@ Work in order. Finish a step before starting the next one inside the same phase.
 
 ### Phase 5 — Reports and go-live (about 1–2 weeks)
 
-26. **Reports.** Sales, profit, stock valuation, expiry, debts, VAT, promotion results. One branch or all.
-27. **Dashboard.** Today's appointments, sales, low stock, near expiry, debts. Branch switcher.
-28. **Go-live.** Somali and Arabic template approval, backup, role training, template quality rating.
+26. **Reports.** Done once migration + seed are applied. Migration `20261014200000_dental_reports_dashboard.sql`: `run_report` (sales, profit, valuation, expiry, debts, VAT, promos) with period today/7d/30d/mtd/ytd; one branch or all (owner). UI at `/reports` with CSV export. Sample go-live marker only (`20261014201000_seed_reports_dashboard_sample.sql` / `node scripts/seed-reports-dashboard.mjs`) — reports reuse existing sales/stock seed data.
+27. **Dashboard.** Done. `dashboard_summary` RPC: today’s sales, appointments list, open AR. Dashboard page shows those KPIs plus existing stock alert counts and attention list. Branch switcher (All branches for owner).
+28. **Go-live.** Done for in-app tracking. Owner Settings → Go-live: checklist (backup, role training, templates reviewed, quality rating), config gaps (VAT/loyalty/MyCash still blank until clinic fills them), template draft/approved counts by language. Meta template approval and production WhatsApp number remain human tasks (step 6).
 
 ## Decisions locked on 2026-10-13
 

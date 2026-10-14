@@ -32,21 +32,12 @@ export function ImportPage() {
   const [fileName, setFileName] = useState<string | null>(null)
 
   const needsBranch = kind === 'customers' || kind === 'opening_stock'
-
-  if (needsBranch && branchId === 'all') {
-    return (
-      <section className="rounded-dentaflow border border-line bg-surface p-6">
-        <h1 className="text-3xl font-semibold">Import</h1>
-        <p className="mt-3 max-w-xl text-muted">
-          Choose one branch in the header before importing customers or opening stock.
-        </p>
-      </section>
-    )
-  }
+  const needsBranchSelected = needsBranch && branchId === 'all'
 
   const batchesQuery = useQuery({
     queryKey: ['import_batches', branchId],
     queryFn: () => fetchImportBatches(branchId),
+    enabled: !needsBranchSelected,
   })
 
   const activeBatch = useMemo(
@@ -62,6 +53,9 @@ export function ImportPage() {
 
   const uploadMutation = useMutation({
     mutationFn: async (file: File) => {
+      if (needsBranch && branchId === 'all') {
+        throw new Error('Choose one branch before importing customers or opening stock.')
+      }
       const rows = await parseExcel(file)
       if (rows.length === 0) throw new Error('Excel file has no data rows.')
       return createImportBatch({
@@ -111,6 +105,17 @@ export function ImportPage() {
   const okRows = (activeBatch?.import_rows ?? []).filter(
     (row) => row.status === 'ok' || row.status === 'applied',
   )
+
+  if (needsBranchSelected) {
+    return (
+      <section className="rounded-dentaflow border border-line bg-surface p-6">
+        <h1 className="text-3xl font-semibold">Import</h1>
+        <p className="mt-3 max-w-xl text-muted">
+          Choose one branch in the header before importing customers or opening stock.
+        </p>
+      </section>
+    )
+  }
 
   return (
     <section className="space-y-5">
