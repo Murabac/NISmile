@@ -21,6 +21,7 @@ export type Customer = {
   language: WhatsAppLanguage
   whatsapp_opt_in: boolean
   credit_limit: number | null
+  loyalty_points: number
   notes: string | null
   created_at: string
   ar_balance?: number

@@ -18,6 +18,7 @@ import {
   createBranchDentist,
   fetchAppointments,
   fetchDentists,
+  rescheduleAppointment,
   setAppointmentStatus,
   startOfWeek,
   toDateKey,
@@ -63,12 +64,15 @@ export function AppointmentsPage() {
   const [addingPatient, setAddingPatient] = useState(false)
   const [newPatientName, setNewPatientName] = useState('')
   const [newPatientPhone, setNewPatientPhone] = useState('')
-  const [newPatientLang, setNewPatientLang] = useState<'so' | 'ar'>('so')
+  const [newPatientLang, setNewPatientLang] = useState<'so' | 'ar' | 'en'>('so')
 
   const [addingDentist, setAddingDentist] = useState(false)
   const [newDentistName, setNewDentistName] = useState('')
   const [newDentistEmail, setNewDentistEmail] = useState('')
   const [newDentistPassword, setNewDentistPassword] = useState('')
+  const [rescheduleDate, setRescheduleDate] = useState('')
+  const [rescheduleTime, setRescheduleTime] = useState('')
+  const [info, setInfo] = useState<string | null>(null)
 
   const weekStart = weekAnchor
   const weekDays = useMemo(
@@ -133,9 +137,31 @@ export function AppointmentsPage() {
     },
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: ['appointments'] })
+      await queryClient.invalidateQueries({ queryKey: ['notification_queue'] })
       setBookingOpen(false)
       setNotes('')
       setError(null)
+      setInfo('Booked. Confirmation and reminders queued when the patient is opted in.')
+    },
+    onError: (err: Error) => setError(err.message),
+  })
+
+  const rescheduleMutation = useMutation({
+    mutationFn: async () => {
+      if (!selected) throw new Error('No appointment')
+      const startAt = new Date(`${rescheduleDate}T${rescheduleTime}:00`)
+      if (Number.isNaN(startAt.getTime())) throw new Error('Invalid date/time')
+      return rescheduleAppointment({
+        appointmentId: selected.id,
+        startAt: startAt.toISOString(),
+      })
+    },
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ['appointments'] })
+      await queryClient.invalidateQueries({ queryKey: ['notification_queue'] })
+      setSelected(null)
+      setError(null)
+      setInfo('Rescheduled. Notice and new reminders queued when opted in.')
     },
     onError: (err: Error) => setError(err.message),
   })
@@ -150,8 +176,10 @@ export function AppointmentsPage() {
     }) => setAppointmentStatus(id, status),
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: ['appointments'] })
+      await queryClient.invalidateQueries({ queryKey: ['notification_queue'] })
       setSelected(null)
       setError(null)
+      setInfo('Status updated. Cancel/reopen notifications queued when applicable.')
     },
     onError: (err: Error) => setError(err.message),
   })
@@ -165,8 +193,10 @@ export function AppointmentsPage() {
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: ['appointments'] })
       await queryClient.invalidateQueries({ queryKey: ['branch_sales'] })
+      await queryClient.invalidateQueries({ queryKey: ['notification_queue'] })
       setSelected(null)
       setError(null)
+      setInfo('Visit completed. Receipt notice queued when the patient is opted in.')
     },
     onError: (err: Error) => setError(err.message),
   })
@@ -340,6 +370,7 @@ export function AppointmentsPage() {
       </div>
 
       {error ? <p className="text-sm text-status-red">{error}</p> : null}
+      {info ? <p className="text-sm text-flow-teal">{info}</p> : null}
 
       {appointmentsQuery.isLoading ? (
         <p className="text-sm text-muted">Loading appointments…</p>
@@ -377,7 +408,16 @@ export function AppointmentsPage() {
                         type="button"
                         onClick={() => {
                           setError(null)
+                          setInfo(null)
                           setSelected(apt)
+                          setRescheduleDate(toDateKey(new Date(apt.start_at)))
+                          setRescheduleTime(
+                            new Date(apt.start_at).toLocaleTimeString('en-GB', {
+                              hour: '2-digit',
+                              minute: '2-digit',
+                              hour12: false,
+                            }),
+                          )
                         }}
                         className="w-full space-y-1.5 rounded-lg border border-line bg-canvas/80 p-3 text-start hover:border-flow-teal"
                       >
@@ -434,7 +474,16 @@ export function AppointmentsPage() {
                     className="cursor-pointer border-b border-line last:border-0 hover:bg-canvas/60"
                     onClick={() => {
                       setError(null)
+                      setInfo(null)
                       setSelected(apt)
+                      setRescheduleDate(toDateKey(new Date(apt.start_at)))
+                      setRescheduleTime(
+                        new Date(apt.start_at).toLocaleTimeString('en-GB', {
+                          hour: '2-digit',
+                          minute: '2-digit',
+                          hour12: false,
+                        }),
+                      )
                     }}
                   >
                     <td className="px-4 py-3 font-mono text-xs font-bold text-marine">
@@ -468,7 +517,7 @@ export function AppointmentsPage() {
         open={bookingOpen}
         onClose={() => setBookingOpen(false)}
         title="Book appointment"
-        subtitle="Retail patient · preferred WhatsApp language is on the customer record (so/ar)."
+        subtitle="Retail patient · preferred WhatsApp language is on the customer record (so/ar/en)."
         footer={
           <div className="flex justify-end gap-2">
             <button
@@ -533,12 +582,13 @@ export function AppointmentsPage() {
                   <select
                     value={newPatientLang}
                     onChange={(event) =>
-                      setNewPatientLang(event.target.value as 'so' | 'ar')
+                      setNewPatientLang(event.target.value as 'so' | 'ar' | 'en')
                     }
                     className="mt-1 h-9 w-full rounded-md border border-line bg-surface px-2 font-normal"
                   >
                     <option value="so">Somali</option>
                     <option value="ar">Arabic</option>
+                    <option value="en">English</option>
                   </select>
                 </label>
                 <button
@@ -801,8 +851,47 @@ export function AppointmentsPage() {
                 Link a service at booking to enable Complete + sale.
               </p>
             ) : null}
+
+            {selected.status === 'scheduled' || selected.status === 'confirmed' ? (
+              <div className="space-y-2 rounded-dentaflow border border-line bg-canvas p-3">
+                <p className="text-xs font-bold">Reschedule</p>
+                <div className="grid grid-cols-2 gap-2">
+                  <label className="block text-[11px] font-semibold">
+                    Date
+                    <input
+                      type="date"
+                      value={rescheduleDate}
+                      onChange={(event) => setRescheduleDate(event.target.value)}
+                      className="mt-1 h-9 w-full rounded-md border border-line bg-surface px-2 font-normal"
+                    />
+                  </label>
+                  <label className="block text-[11px] font-semibold">
+                    Time
+                    <input
+                      type="time"
+                      value={rescheduleTime}
+                      onChange={(event) => setRescheduleTime(event.target.value)}
+                      className="mt-1 h-9 w-full rounded-md border border-line bg-surface px-2 font-normal"
+                    />
+                  </label>
+                </div>
+                <button
+                  type="button"
+                  disabled={rescheduleMutation.isPending}
+                  onClick={() => {
+                    setError(null)
+                    rescheduleMutation.mutate()
+                  }}
+                  className="h-9 w-full rounded-dentaflow border border-line text-xs font-bold disabled:opacity-60"
+                >
+                  {rescheduleMutation.isPending ? 'Saving…' : 'Save new time + notify'}
+                </button>
+              </div>
+            ) : null}
+
             <p className="text-[11px] text-muted">
-              Confirmation and reminder WhatsApp messages are step 20+.
+              Opted-in patients get Somali/Arabic confirmation, 24h/2h reminders, and
+              cancel/reschedule notices in the WhatsApp queue (Meta send later).
             </p>
           </div>
         ) : null}

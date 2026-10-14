@@ -1,0 +1,9 @@
+# Supabase local/project config for DentaFlow Edge Functions.
+# WhatsApp secrets (VERIFY_TOKEN, APP_SECRET, access token) live in
+# Edge Function secrets — never in the frontend or this file's values.
+
+[functions.whatsapp-webhook]
+verify_jwt = false
+
+[functions.send-whatsapp]
+verify_jwt = true

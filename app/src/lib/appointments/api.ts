@@ -16,7 +16,7 @@ const appointmentSelect = `
 
 function normalizeAppointment(row: Record<string, unknown>): Appointment {
   const customer = row.customers as
-    | { name: string; phone: string | null; language: 'so' | 'ar' }
+    | { name: string; phone: string | null; language: 'so' | 'ar' | 'en' }
     | null
   const dentist = row.profiles as { name: string } | null
   const service = row.services as
@@ -139,6 +139,19 @@ export async function setAppointmentStatus(
   const { error } = await supabase.rpc('set_appointment_status', {
     p_appointment_id: appointmentId,
     p_status: status,
+  })
+  if (error) throw error
+}
+
+export async function rescheduleAppointment(input: {
+  appointmentId: string
+  startAt: string
+  endAt?: string | null
+}): Promise<void> {
+  const { error } = await supabase.rpc('reschedule_appointment', {
+    p_appointment_id: input.appointmentId,
+    p_start_at: input.startAt,
+    p_end_at: input.endAt ?? null,
   })
   if (error) throw error
 }

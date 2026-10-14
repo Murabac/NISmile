@@ -161,7 +161,7 @@ export function ImportPage() {
           <TemplateCard
             icon={<Users className="h-7 w-7 text-flow-teal" />}
             title="Customers"
-            body="Name, retail/wholesale, phone (+252), WhatsApp language so/ar, credit limit."
+            body="Name, retail/wholesale, phone (+252), WhatsApp language so/ar/en, credit limit."
             onDownload={() => {
               setKind('customers')
               downloadTemplate('customers')

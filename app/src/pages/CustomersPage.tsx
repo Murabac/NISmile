@@ -63,7 +63,7 @@ export function CustomersPage() {
   const [phone, setPhone] = useState('')
   const [customerType, setCustomerType] = useState<CustomerType>('retail')
   const [subtype, setSubtype] = useState<WholesaleSubtype>('clinic')
-  const [language, setLanguage] = useState<'so' | 'ar'>('so')
+  const [language, setLanguage] = useState<'so' | 'ar' | 'en'>('so')
   const [whatsappOptIn, setWhatsappOptIn] = useState(true)
   const [creditLimit, setCreditLimit] = useState('1000')
   const [notes, setNotes] = useState('')
@@ -333,7 +333,16 @@ export function CustomersPage() {
                 <p className="text-xs text-muted">
                   {selected.customer_type}
                   {selected.subtype ? ` · ${selected.subtype}` : ''} ·{' '}
-                  {selected.phone ?? 'No phone'}
+                  {selected.phone ?? 'No phone'} · WhatsApp{' '}
+                  {selected.language.toUpperCase()} · Points{' '}
+                  <span className="font-mono font-bold">{selected.loyalty_points ?? 0}</span>
+                </p>
+                <p className="mt-1 text-[11px] font-semibold">
+                  {selected.whatsapp_opt_in ? (
+                    <span className="text-status-green">WhatsApp opted in</span>
+                  ) : (
+                    <span className="text-status-red">WhatsApp opted out</span>
+                  )}
                 </p>
               </div>
 
@@ -620,11 +629,14 @@ export function CustomersPage() {
             WhatsApp language
             <select
               value={language}
-              onChange={(event) => setLanguage(event.target.value as 'so' | 'ar')}
+              onChange={(event) =>
+                setLanguage(event.target.value as 'so' | 'ar' | 'en')
+              }
               className="mt-1 h-10 w-full rounded-dentaflow border border-line bg-canvas px-3 font-normal"
             >
               <option value="so">Somali</option>
               <option value="ar">Arabic</option>
+              <option value="en">English</option>
             </select>
           </label>
           <label className="flex items-center gap-2 text-sm font-semibold">

@@ -26,6 +26,7 @@ export type CheckoutInput = {
   payments: CheckoutPaymentInput[]
   notes?: string | null
   dueDate?: string | null
+  redeemPoints?: number
 }
 
 export type SalePayment = {
@@ -83,6 +84,7 @@ export type PosCustomer = {
   customer_type: 'retail' | 'wholesale'
   credit_limit: number | null
   subtype: string | null
+  loyalty_points: number
 }
 
 export type StatementLine = {

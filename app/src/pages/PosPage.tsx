@@ -19,6 +19,8 @@ import { fetchItems, fetchServices, basePrice } from '../lib/catalog/api.ts'
 import type { CatalogItem, CatalogService } from '../lib/catalog/types.ts'
 import { formatMoney } from '../lib/money.ts'
 import { customerArBalance } from '../lib/customers/api.ts'
+import { fetchClinicSettings, previewLoyaltyRedeem } from '../lib/loyalty/api.ts'
+import { evaluateCartPromotion } from '../lib/promotions/api.ts'
 import {
   checkoutSale,
   fetchBranchCustomers,
@@ -61,7 +63,7 @@ export function PosPage() {
   const [tab, setTab] = useState<'items' | 'services'>('items')
   const [search, setSearch] = useState('')
   const [categoryId, setCategoryId] = useState('all')
-  const [customerId, setCustomerId] = useState<string>('walk-in')
+  const [customerId, setCustomerIdState] = useState<string>('walk-in')
   const [cart, setCart] = useState<CartLine[]>([])
   const [tenders, setTenders] = useState<TenderDraft>(emptyTenders)
   const [chargeToAccount, setChargeToAccount] = useState(false)
@@ -72,6 +74,12 @@ export function PosPage() {
   const [docsOpen, setDocsOpen] = useState(false)
   const [docsMode, setDocsMode] = useState<'receipt' | 'invoice'>('receipt')
   const [returnOpen, setReturnOpen] = useState(false)
+  const [redeemLoyalty, setRedeemLoyalty] = useState(false)
+
+  function setCustomerId(id: string) {
+    setCustomerIdState(id)
+    setRedeemLoyalty(false)
+  }
 
   if (branchId === 'all') {
     return (
@@ -93,6 +101,10 @@ export function PosPage() {
   const stockQuery = useQuery({
     queryKey: ['stock_summaries', branchId],
     queryFn: () => fetchBranchStockSummaries(branchId),
+  })
+  const settingsQuery = useQuery({
+    queryKey: ['clinic_settings'],
+    queryFn: fetchClinicSettings,
   })
 
   const items = (itemsQuery.data ?? []).filter((row) => row.active) as CatalogItem[]
@@ -158,21 +170,104 @@ export function PosPage() {
     })
   }, [services, search, categoryId])
 
+  const cartLinesPayload = useMemo(
+    () =>
+      cart.map((line) => ({
+        line_type: line.line_type,
+        item_id: line.item_id,
+        service_id: line.service_id,
+        qty: line.qty,
+      })),
+    [cart],
+  )
+
+  const promoQuery = useQuery({
+    queryKey: ['cart_promo', branchId, customerId, cartLinesPayload],
+    queryFn: () =>
+      evaluateCartPromotion({
+        branchId,
+        customerId: customerId === 'walk-in' ? null : customerId,
+        lines: cartLinesPayload,
+      }),
+    enabled: cart.length > 0,
+  })
+
+  const promoName = promoQuery.data?.name ?? promoQuery.data?.code ?? null
+  const settings = settingsQuery.data
+  const loyaltyBalance = selectedCustomer?.loyalty_points ?? 0
+  const minRedeemOk =
+    settings?.loyalty_min_redeem_points == null ||
+    loyaltyBalance >= settings.loyalty_min_redeem_points
+  const loyaltyRatesReady =
+    settings?.loyalty_usd_per_point != null &&
+    settings.loyalty_usd_per_point > 0 &&
+    loyaltyBalance > 0 &&
+    minRedeemOk
+
+  const netAfterPromo = useMemo(() => {
+    if (promoQuery.data && cart.length > 0) {
+      return round2(promoQuery.data.subtotal - promoQuery.data.discount_total)
+    }
+    return round2(cart.reduce((sum, line) => sum + line.unit_price * line.qty, 0))
+  }, [cart, promoQuery.data])
+
+  const loyaltyQuery = useQuery({
+    queryKey: ['loyalty_preview', customerId, loyaltyBalance, netAfterPromo, redeemLoyalty],
+    queryFn: () =>
+      previewLoyaltyRedeem({
+        customerId,
+        redeemPoints: loyaltyBalance,
+        remainingNet: netAfterPromo,
+      }),
+    enabled:
+      redeemLoyalty &&
+      customerId !== 'walk-in' &&
+      cart.length > 0 &&
+      Boolean(settings?.loyalty_usd_per_point),
+  })
+
+  const loyaltyDiscount = redeemLoyalty && loyaltyQuery.data?.ok ? loyaltyQuery.data.discount : 0
+  const loyaltyPointsUsed =
+    redeemLoyalty && loyaltyQuery.data?.ok ? loyaltyQuery.data.points : 0
+
   const cartTotals = useMemo(() => {
+    if (promoQuery.data && cart.length > 0) {
+      const promoDisc = promoQuery.data.discount_total
+      const subtotal = promoQuery.data.subtotal
+      const taxable = Math.max(0, round2(subtotal - promoDisc - loyaltyDiscount))
+      // Recalculate tax proportionally from promo-priced lines after loyalty.
+      const preTaxable = Math.max(0, round2(subtotal - promoDisc))
+      const taxTotal =
+        preTaxable > 0
+          ? round2(promoQuery.data.tax_total * (taxable / preTaxable))
+          : 0
+      return {
+        subtotal,
+        discount: round2(promoDisc + loyaltyDiscount),
+        promoDiscount: promoDisc,
+        loyaltyDiscount,
+        taxTotal,
+        total: round2(taxable + taxTotal),
+      }
+    }
     let subtotal = 0
     let taxTotal = 0
     for (const line of cart) {
       const net = line.unit_price * line.qty
-      const tax = net * line.tax_rate
       subtotal += net
-      taxTotal += tax
+      taxTotal += net * line.tax_rate
     }
+    const taxable = Math.max(0, round2(subtotal - loyaltyDiscount))
+    const taxAdj = subtotal > 0 ? round2(taxTotal * (taxable / subtotal)) : 0
     return {
       subtotal: round2(subtotal),
-      taxTotal: round2(taxTotal),
-      total: round2(subtotal + taxTotal),
+      discount: round2(loyaltyDiscount),
+      promoDiscount: 0,
+      loyaltyDiscount,
+      taxTotal: taxAdj,
+      total: round2(taxable + taxAdj),
     }
-  }, [cart])
+  }, [cart, promoQuery.data, loyaltyDiscount])
 
   const paidTotal = useMemo(() => {
     return round2(
@@ -228,6 +323,7 @@ export function PosPage() {
         })),
         payments,
         dueDate: isWholesale && unpaid > 0.009 && chargeToAccount ? dueDate : null,
+        redeemPoints: redeemLoyalty ? loyaltyPointsUsed : 0,
       })
       return fetchSale(saleId)
     },
@@ -236,6 +332,7 @@ export function PosPage() {
       setCart([])
       setTenders(emptyTenders())
       setChargeToAccount(false)
+      setRedeemLoyalty(false)
       setDueDate(defaultDueDate())
       setLastSale(sale)
       setLastCustomerName(
@@ -247,6 +344,8 @@ export function PosPage() {
       setDocsOpen(true)
       await queryClient.invalidateQueries({ queryKey: ['stock_summaries'] })
       await queryClient.invalidateQueries({ queryKey: ['sales'] })
+      await queryClient.invalidateQueries({ queryKey: ['pos_customers'] })
+      await queryClient.invalidateQueries({ queryKey: ['customers'] })
       await queryClient.invalidateQueries({ queryKey: ['customer_ar'] })
       await queryClient.invalidateQueries({ queryKey: ['customers'] })
     },
@@ -730,11 +829,64 @@ export function PosPage() {
             )}
           </div>
 
+          {customerId !== 'walk-in' ? (
+            <div className="rounded-dentaflow border border-line bg-canvas p-3 text-xs">
+              <div className="flex items-center justify-between gap-2">
+                <div>
+                  <p className="font-bold">Loyalty points</p>
+                  <p className="text-muted">
+                    Balance:{' '}
+                    <span className="font-mono font-bold text-main">{loyaltyBalance}</span>
+                    {!settings?.loyalty_usd_per_point ? (
+                      <span className="ms-1">(rates blank in Settings)</span>
+                    ) : null}
+                  </p>
+                </div>
+                <label className="flex items-center gap-2 font-semibold">
+                  <input
+                    type="checkbox"
+                    checked={redeemLoyalty}
+                    disabled={!loyaltyRatesReady}
+                    onChange={(e) => setRedeemLoyalty(e.target.checked)}
+                  />
+                  Redeem
+                </label>
+              </div>
+              {redeemLoyalty && loyaltyQuery.data && !loyaltyQuery.data.ok ? (
+                <p className="mt-2 text-status-amber">
+                  {loyaltyQuery.data.reason === 'rates_blank'
+                    ? 'Owner must set redeem value in Settings first.'
+                    : loyaltyQuery.data.reason === 'below_min'
+                      ? 'Below minimum redeem balance.'
+                      : 'Cannot redeem on this cart.'}
+                </p>
+              ) : null}
+            </div>
+          ) : null}
+
           <div className="space-y-1.5 rounded-dentaflow bg-canvas p-3 text-xs">
             <div className="flex justify-between">
               <span className="text-muted">Subtotal (ex-VAT)</span>
               <span className="font-mono font-bold">{formatMoney(cartTotals.subtotal)}</span>
             </div>
+            {cartTotals.promoDiscount > 0.009 ? (
+              <div className="flex justify-between text-[#FF6B57]">
+                <span className="font-semibold">
+                  Promo{promoName ? `: ${promoName}` : ''}
+                </span>
+                <span className="font-mono font-bold">-{formatMoney(cartTotals.promoDiscount)}</span>
+              </div>
+            ) : null}
+            {cartTotals.loyaltyDiscount > 0.009 ? (
+              <div className="flex justify-between text-flow-teal">
+                <span className="font-semibold">
+                  Points ({loyaltyPointsUsed} pts)
+                </span>
+                <span className="font-mono font-bold">
+                  -{formatMoney(cartTotals.loyaltyDiscount)}
+                </span>
+              </div>
+            ) : null}
             <div className="flex justify-between">
               <span className="text-muted">VAT</span>
               <span className="font-mono font-bold">{formatMoney(cartTotals.taxTotal)}</span>

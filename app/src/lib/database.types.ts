@@ -5,7 +5,7 @@ export type StaffRole =
   | 'dentist'
   | 'storekeeper'
 
-export type WhatsAppLanguage = 'so' | 'ar'
+export type WhatsAppLanguage = 'so' | 'ar' | 'en'
 
 export type PriceList = 'retail' | 'wholesale'
 
@@ -126,6 +126,7 @@ export type Database = {
           language: WhatsAppLanguage
           whatsapp_opt_in: boolean
           credit_limit: number | null
+          loyalty_points: number
           notes: string | null
           created_at: string
         }
@@ -139,6 +140,7 @@ export type Database = {
           language?: WhatsAppLanguage
           whatsapp_opt_in?: boolean
           credit_limit?: number | null
+          loyalty_points?: number
           notes?: string | null
           created_at?: string
         }
@@ -151,6 +153,7 @@ export type Database = {
           language?: WhatsAppLanguage
           whatsapp_opt_in?: boolean
           credit_limit?: number | null
+          loyalty_points?: number
           notes?: string | null
         }
         Relationships: []
@@ -949,6 +952,276 @@ export type Database = {
         }
         Relationships: []
       }
+      promotions: {
+        Row: {
+          id: string
+          code: string
+          name: string
+          description: string | null
+          promo_type:
+            | 'percentage'
+            | 'fixed_amount'
+            | 'buy_x_get_y'
+            | 'bundle'
+            | 'spend_threshold'
+          audience:
+            | 'all'
+            | 'retail'
+            | 'wholesale'
+            | 'wholesale_subtype'
+            | 'named_customers'
+          wholesale_subtype: string | null
+          scope: 'invoice' | 'items' | 'services' | 'categories'
+          percent_off: number | null
+          amount_off: number | null
+          buy_qty: number | null
+          get_qty: number | null
+          bundle_price: number | null
+          spend_min: number | null
+          min_qty: number | null
+          max_redemptions_total: number | null
+          max_redemptions_per_customer: number | null
+          starts_at: string
+          ends_at: string
+          status: 'draft' | 'scheduled' | 'active' | 'paused' | 'ended'
+          notify_whatsapp: boolean
+          whatsapp_message_en: string | null
+          whatsapp_message_so: string | null
+          whatsapp_message_ar: string | null
+          created_by: string | null
+          published_at: string | null
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          code: string
+          name: string
+          description?: string | null
+          promo_type:
+            | 'percentage'
+            | 'fixed_amount'
+            | 'buy_x_get_y'
+            | 'bundle'
+            | 'spend_threshold'
+          audience?:
+            | 'all'
+            | 'retail'
+            | 'wholesale'
+            | 'wholesale_subtype'
+            | 'named_customers'
+          wholesale_subtype?: string | null
+          scope?: 'invoice' | 'items' | 'services' | 'categories'
+          percent_off?: number | null
+          amount_off?: number | null
+          buy_qty?: number | null
+          get_qty?: number | null
+          bundle_price?: number | null
+          spend_min?: number | null
+          min_qty?: number | null
+          max_redemptions_total?: number | null
+          max_redemptions_per_customer?: number | null
+          starts_at: string
+          ends_at: string
+          status?: 'draft' | 'scheduled' | 'active' | 'paused' | 'ended'
+          notify_whatsapp?: boolean
+          whatsapp_message_en?: string | null
+          whatsapp_message_so?: string | null
+          whatsapp_message_ar?: string | null
+          created_by?: string | null
+          published_at?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          name?: string
+          description?: string | null
+          status?: 'draft' | 'scheduled' | 'active' | 'paused' | 'ended'
+          notify_whatsapp?: boolean
+          whatsapp_message_en?: string | null
+          whatsapp_message_so?: string | null
+          whatsapp_message_ar?: string | null
+          published_at?: string | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      promotion_branches: {
+        Row: {
+          promotion_id: string
+          branch_id: string
+        }
+        Insert: {
+          promotion_id: string
+          branch_id: string
+        }
+        Update: {
+          promotion_id?: string
+          branch_id?: string
+        }
+        Relationships: []
+      }
+      promotion_targets: {
+        Row: {
+          id: string
+          promotion_id: string
+          target_kind: 'item' | 'service' | 'category' | 'customer'
+          item_id: string | null
+          service_id: string | null
+          category_id: string | null
+          customer_id: string | null
+        }
+        Insert: {
+          id?: string
+          promotion_id: string
+          target_kind: 'item' | 'service' | 'category' | 'customer'
+          item_id?: string | null
+          service_id?: string | null
+          category_id?: string | null
+          customer_id?: string | null
+        }
+        Update: {
+          target_kind?: 'item' | 'service' | 'category' | 'customer'
+          item_id?: string | null
+          service_id?: string | null
+          category_id?: string | null
+          customer_id?: string | null
+        }
+        Relationships: []
+      }
+      promotion_redemptions: {
+        Row: {
+          id: string
+          promotion_id: string
+          sale_id: string
+          branch_id: string
+          customer_id: string | null
+          discount_amount: number
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          promotion_id: string
+          sale_id: string
+          branch_id: string
+          customer_id?: string | null
+          discount_amount: number
+          created_at?: string
+        }
+        Update: {
+          discount_amount?: number
+        }
+        Relationships: []
+      }
+      clinic_settings: {
+        Row: {
+          id: string
+          vat_percent: number | null
+          loyalty_earn_per_usd: number | null
+          loyalty_usd_per_point: number | null
+          loyalty_min_redeem_points: number | null
+          loyalty_expire_days: number | null
+          updated_by: string | null
+          updated_at: string
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          vat_percent?: number | null
+          loyalty_earn_per_usd?: number | null
+          loyalty_usd_per_point?: number | null
+          loyalty_min_redeem_points?: number | null
+          loyalty_expire_days?: number | null
+          updated_by?: string | null
+          updated_at?: string
+          created_at?: string
+        }
+        Update: {
+          vat_percent?: number | null
+          loyalty_earn_per_usd?: number | null
+          loyalty_usd_per_point?: number | null
+          loyalty_min_redeem_points?: number | null
+          loyalty_expire_days?: number | null
+          updated_by?: string | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      loyalty_transactions: {
+        Row: {
+          id: string
+          customer_id: string
+          tx_type: 'earn' | 'redeem' | 'reverse' | 'adjust'
+          points: number
+          balance_after: number
+          sale_id: string | null
+          return_id: string | null
+          notes: string | null
+          expires_at: string | null
+          created_by: string | null
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          customer_id: string
+          tx_type: 'earn' | 'redeem' | 'reverse' | 'adjust'
+          points: number
+          balance_after: number
+          sale_id?: string | null
+          return_id?: string | null
+          notes?: string | null
+          expires_at?: string | null
+          created_by?: string | null
+          created_at?: string
+        }
+        Update: {
+          notes?: string | null
+        }
+        Relationships: []
+      }
+      campaigns: {
+        Row: {
+          id: string
+          name: string
+          promotion_id: string | null
+          kind: string
+          status: 'draft' | 'scheduled' | 'sending' | 'sent' | 'cancelled'
+          scheduled_at: string
+          started_at: string | null
+          completed_at: string | null
+          target_count: number
+          enqueued_count: number
+          skipped_count: number
+          created_by: string | null
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          name: string
+          promotion_id?: string | null
+          kind: string
+          status?: 'draft' | 'scheduled' | 'sending' | 'sent' | 'cancelled'
+          scheduled_at?: string
+          started_at?: string | null
+          completed_at?: string | null
+          target_count?: number
+          enqueued_count?: number
+          skipped_count?: number
+          created_by?: string | null
+          created_at?: string
+        }
+        Update: {
+          name?: string
+          status?: 'draft' | 'scheduled' | 'sending' | 'sent' | 'cancelled'
+          scheduled_at?: string
+          started_at?: string | null
+          completed_at?: string | null
+          target_count?: number
+          enqueued_count?: number
+          skipped_count?: number
+        }
+        Relationships: []
+      }
     }
     Views: Record<string, never>
     Functions: {
@@ -987,8 +1260,86 @@ export type Database = {
           p_payments: unknown
           p_notes?: string | null
           p_due_date?: string | null
+          p_redeem_points?: number
         }
         Returns: string
+      }
+      next_promotion_code: { Args: Record<string, never>; Returns: string }
+      publish_promotion: {
+        Args: { p_promotion_id: string }
+        Returns: unknown
+      }
+      set_promotion_status: {
+        Args: {
+          p_promotion_id: string
+          p_status: 'draft' | 'scheduled' | 'active' | 'paused' | 'ended'
+        }
+        Returns: unknown
+      }
+      count_promotion_audience: {
+        Args: { p_promotion_id: string }
+        Returns: number
+      }
+      evaluate_best_promotion: {
+        Args: {
+          p_branch_id: string
+          p_customer_id: string | null
+          p_lines: unknown
+        }
+        Returns: unknown
+      }
+      get_clinic_settings: { Args: Record<string, never>; Returns: unknown }
+      update_clinic_settings: {
+        Args: {
+          p_vat_percent?: number | null
+          p_loyalty_earn_per_usd?: number | null
+          p_loyalty_usd_per_point?: number | null
+          p_loyalty_min_redeem_points?: number | null
+          p_loyalty_expire_days?: number | null
+          p_clear_vat?: boolean
+          p_clear_loyalty_earn?: boolean
+          p_clear_loyalty_redeem?: boolean
+          p_clear_loyalty_min?: boolean
+          p_clear_loyalty_expire?: boolean
+        }
+        Returns: unknown
+      }
+      preview_loyalty_redeem: {
+        Args: {
+          p_customer_id: string
+          p_redeem_points: number
+          p_remaining_net: number
+        }
+        Returns: unknown
+      }
+      adjust_loyalty_points: {
+        Args: {
+          p_customer_id: string
+          p_points: number
+          p_notes?: string | null
+        }
+        Returns: unknown
+      }
+      list_promotion_audience: {
+        Args: { p_promotion_id: string }
+        Returns: unknown
+      }
+      enqueue_promotion_campaign: {
+        Args: {
+          p_promotion_id: string
+          p_kind?: string
+          p_scheduled_at?: string | null
+          p_name?: string | null
+        }
+        Returns: string
+      }
+      cancel_campaign: {
+        Args: { p_campaign_id: string }
+        Returns: unknown
+      }
+      campaign_stats: {
+        Args: { p_campaign_id: string }
+        Returns: unknown
       }
       customer_ar_balance: {
         Args: { p_customer_id: string }

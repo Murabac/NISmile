@@ -10,7 +10,7 @@ Read `CONTEXT.md` before building. The product spec is `DentaFlow-Project-Plan-v
 - The real app goes in `app/`. Do not add production code under `Design Ref/`.
 - GitHub remote is https://github.com/Murabac/NISmile.git. Never commit `app/.env.local` or the service role key.
 - Stack: React, TypeScript, Vite, Tailwind 4, TanStack Query, Supabase `dental` schema, WhatsApp Cloud API via Edge Functions.
-- Staff UI is English only. Somali and Arabic are WhatsApp message content, chosen per customer. Do not add a language switcher, react-i18next, or an RTL layout.
+- Staff UI is English only. WhatsApp message content is Somali, Arabic, or English per customer. Do not add a UI language switcher, react-i18next, or an RTL layout.
 - Match the prototype's screens and tokens. Decisions in `CONTEXT.md` override the plan and the prototype.
 - Currency is USD. Stock changes only through the movement ledger. Checkout is one transaction.
 - Coral `#FF6B57` is for promotions only.

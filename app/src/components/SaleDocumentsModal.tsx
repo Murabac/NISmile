@@ -1,5 +1,6 @@
 import { useState } from 'react'
-import { Printer, X } from 'lucide-react'
+import { useMutation } from '@tanstack/react-query'
+import { MessageSquare, Printer, X } from 'lucide-react'
 import {
   CLINIC_ADDRESS,
   CLINIC_EDAHAB,
@@ -14,6 +15,7 @@ import {
   type ThermalWidth,
 } from '../lib/clinic.ts'
 import { formatMoney } from '../lib/money.ts'
+import { notifySaleDocument } from '../lib/sales/api.ts'
 import type { Sale } from '../lib/sales/types.ts'
 import { TENDER_LABELS } from '../lib/sales/types.ts'
 
@@ -32,6 +34,19 @@ export function SaleDocumentsModal({
 }) {
   const [mode, setMode] = useState<DocMode>(defaultMode)
   const [width, setWidth] = useState<ThermalWidth>(80)
+  const [notice, setNotice] = useState<string | null>(null)
+
+  const notifyMutation = useMutation({
+    mutationFn: () => notifySaleDocument(sale.id),
+    onSuccess: (id) => {
+      setNotice(
+        id
+          ? 'WhatsApp notice queued (Somali/Arabic). PDF stays English when attached later.'
+          : 'No notice queued — customer may be walk-in, opted out, or already notified.',
+      )
+    },
+    onError: (err: Error) => setNotice(err.message),
+  })
 
   return (
     <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/40 p-4 print:static print:bg-transparent print:p-0">
@@ -86,6 +101,20 @@ export function SaleDocumentsModal({
                 </button>
               </div>
             ) : null}
+            {sale.customer_id ? (
+              <button
+                type="button"
+                disabled={notifyMutation.isPending}
+                onClick={() => {
+                  setNotice(null)
+                  notifyMutation.mutate()
+                }}
+                className="inline-flex h-9 items-center gap-2 rounded-dentaflow border border-line px-3 text-xs font-semibold disabled:opacity-60"
+              >
+                <MessageSquare className="h-3.5 w-3.5" />
+                Queue WhatsApp notice
+              </button>
+            ) : null}
             <button
               type="button"
               onClick={() => window.print()}
@@ -104,6 +133,9 @@ export function SaleDocumentsModal({
             </button>
           </div>
         </div>
+        {notice ? (
+          <p className="mb-3 text-xs text-flow-teal no-print">{notice}</p>
+        ) : null}
 
         <div
           className={

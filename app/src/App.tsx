@@ -16,6 +16,8 @@ import { ServicesPage } from './pages/ServicesPage.tsx'
 import { SettingsPage } from './pages/SettingsPage.tsx'
 import { StockPage } from './pages/StockPage.tsx'
 import { TransfersPage } from './pages/TransfersPage.tsx'
+import { WhatsAppPage } from './pages/WhatsAppPage.tsx'
+import { PromotionsPage } from './pages/PromotionsPage.tsx'
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -36,6 +38,8 @@ function screenElement(path: string) {
   if (path === '/purchases') return <PurchasesPage />
   if (path === '/customers') return <CustomersPage />
   if (path === '/appointments') return <AppointmentsPage />
+  if (path === '/promotions') return <PromotionsPage />
+  if (path === '/whatsapp') return <WhatsAppPage />
   if (path === '/import') return <ImportPage />
   if (path === '/settings') return <SettingsPage />
   return <ScreenPage />

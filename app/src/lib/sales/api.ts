@@ -26,13 +26,14 @@ const saleSelect = `
 export async function fetchBranchCustomers(branchId: string): Promise<PosCustomer[]> {
   const { data, error } = await supabase
     .from('customers')
-    .select('id, name, phone, customer_type, credit_limit, subtype')
+    .select('id, name, phone, customer_type, credit_limit, subtype, loyalty_points')
     .eq('branch_id', branchId)
     .order('name')
   if (error) throw error
   return (data ?? []).map((row) => ({
     ...row,
     credit_limit: row.credit_limit == null ? null : Number(row.credit_limit),
+    loyalty_points: Number(row.loyalty_points ?? 0),
   })) as PosCustomer[]
 }
 
@@ -44,6 +45,7 @@ export async function checkoutSale(input: CheckoutInput): Promise<string> {
     p_payments: input.payments,
     p_notes: input.notes ?? null,
     p_due_date: input.dueDate ?? null,
+    p_redeem_points: input.redeemPoints ?? 0,
   })
   if (error) throw error
   return data as string
@@ -63,6 +65,14 @@ export async function applyCustomerPayment(input: {
   })
   if (error) throw error
   return data as string
+}
+
+export async function notifySaleDocument(saleId: string): Promise<string | null> {
+  const { data, error } = await supabase.rpc('notify_sale_document', {
+    p_sale_id: saleId,
+  })
+  if (error) throw error
+  return (data as string | null) ?? null
 }
 
 export async function processReturn(input: ProcessReturnInput): Promise<string> {

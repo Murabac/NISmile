@@ -5,7 +5,7 @@ export async function fetchCustomers(branchId: string): Promise<Customer[]> {
   const { data, error } = await supabase
     .from('customers')
     .select(
-      'id, branch_id, name, phone, customer_type, subtype, language, whatsapp_opt_in, credit_limit, notes, created_at',
+      'id, branch_id, name, phone, customer_type, subtype, language, whatsapp_opt_in, credit_limit, loyalty_points, notes, created_at',
     )
     .eq('branch_id', branchId)
     .order('name')
@@ -14,12 +14,13 @@ export async function fetchCustomers(branchId: string): Promise<Customer[]> {
   const rows = (data ?? []) as Customer[]
   const withBalances = await Promise.all(
     rows.map(async (row) => {
-      if (row.customer_type !== 'wholesale') return { ...row, ar_balance: 0 }
+      const base = { ...row, loyalty_points: Number(row.loyalty_points ?? 0) }
+      if (row.customer_type !== 'wholesale') return { ...base, ar_balance: 0 }
       const { data: bal, error: balErr } = await supabase.rpc('customer_ar_balance', {
         p_customer_id: row.id,
       })
       if (balErr) throw balErr
-      return { ...row, ar_balance: Number(bal ?? 0) }
+      return { ...base, ar_balance: Number(bal ?? 0) }
     }),
   )
   return withBalances
@@ -29,14 +30,18 @@ export async function fetchCustomer(id: string): Promise<Customer | null> {
   const { data, error } = await supabase
     .from('customers')
     .select(
-      'id, branch_id, name, phone, customer_type, subtype, language, whatsapp_opt_in, credit_limit, notes, created_at',
+      'id, branch_id, name, phone, customer_type, subtype, language, whatsapp_opt_in, credit_limit, loyalty_points, notes, created_at',
     )
     .eq('id', id)
     .maybeSingle()
   if (error) throw error
   if (!data) return null
   const { data: bal } = await supabase.rpc('customer_ar_balance', { p_customer_id: id })
-  return { ...(data as Customer), ar_balance: Number(bal ?? 0) }
+  return {
+    ...(data as Customer),
+    loyalty_points: Number((data as Customer).loyalty_points ?? 0),
+    ar_balance: Number(bal ?? 0),
+  }
 }
 
 export async function saveCustomer(

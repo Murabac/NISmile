@@ -1,4 +1,4 @@
-import { useState, type FormEvent } from 'react'
+import { useEffect, useState, type FormEvent } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import {
   createCategory,
@@ -8,20 +8,24 @@ import {
   updateCategory,
   updateTaxRate,
 } from '../lib/catalog/api.ts'
+import { useAuth } from '../lib/auth.tsx'
+import { fetchClinicSettings, updateClinicSettings } from '../lib/loyalty/api.ts'
 import { formatTaxPercent } from '../lib/money.ts'
 
-type Tab = 'tax' | 'categories'
+type Tab = 'tax' | 'categories' | 'loyalty'
 
 export function SettingsPage() {
   const [tab, setTab] = useState<Tab>('tax')
   const queryClient = useQueryClient()
+  const { profile } = useAuth()
+  const isOwner = profile?.role === 'owner'
 
   return (
     <section className="space-y-4">
       <div>
         <h1 className="text-3xl font-semibold">Settings</h1>
         <p className="mt-1 text-sm text-muted">
-          Shared catalog settings. Clinic VAT percentage stays blank until you add a tax rate here.
+          Shared catalog settings. VAT and loyalty rates stay blank until the owner fills them in.
         </p>
       </div>
       <div className="flex gap-2 border-b border-line">
@@ -31,10 +35,157 @@ export function SettingsPage() {
         <TabButton active={tab === 'categories'} onClick={() => setTab('categories')}>
           Categories
         </TabButton>
+        {isOwner ? (
+          <TabButton active={tab === 'loyalty'} onClick={() => setTab('loyalty')}>
+            Loyalty
+          </TabButton>
+        ) : null}
       </div>
       {tab === 'tax' ? <TaxRatesPanel queryClient={queryClient} /> : null}
       {tab === 'categories' ? <CategoriesPanel queryClient={queryClient} /> : null}
+      {tab === 'loyalty' && isOwner ? <LoyaltySettingsPanel queryClient={queryClient} /> : null}
     </section>
+  )
+}
+
+function LoyaltySettingsPanel({ queryClient }: { queryClient: ReturnType<typeof useQueryClient> }) {
+  const settingsQuery = useQuery({ queryKey: ['clinic_settings'], queryFn: fetchClinicSettings })
+  const [earn, setEarn] = useState('')
+  const [usdPerPoint, setUsdPerPoint] = useState('')
+  const [minRedeem, setMinRedeem] = useState('')
+  const [expireDays, setExpireDays] = useState('')
+  const [error, setError] = useState<string | null>(null)
+  const [info, setInfo] = useState<string | null>(null)
+
+  useEffect(() => {
+    const s = settingsQuery.data
+    if (!s) return
+    setEarn(s.loyalty_earn_per_usd == null ? '' : String(s.loyalty_earn_per_usd))
+    setUsdPerPoint(s.loyalty_usd_per_point == null ? '' : String(s.loyalty_usd_per_point))
+    setMinRedeem(
+      s.loyalty_min_redeem_points == null ? '' : String(s.loyalty_min_redeem_points),
+    )
+    setExpireDays(s.loyalty_expire_days == null ? '' : String(s.loyalty_expire_days))
+  }, [settingsQuery.data])
+
+  const saveMutation = useMutation({
+    mutationFn: updateClinicSettings,
+    onSuccess: async () => {
+      setError(null)
+      setInfo('Loyalty settings saved.')
+      await queryClient.invalidateQueries({ queryKey: ['clinic_settings'] })
+    },
+    onError: (err: Error) => {
+      setInfo(null)
+      setError(err.message)
+    },
+  })
+
+  function onSave(event: FormEvent) {
+    event.preventDefault()
+    const earnN = earn.trim() === '' ? null : Number(earn)
+    const usdN = usdPerPoint.trim() === '' ? null : Number(usdPerPoint)
+    const minN = minRedeem.trim() === '' ? null : Number(minRedeem)
+    const expN = expireDays.trim() === '' ? null : Number(expireDays)
+    if (earnN != null && (Number.isNaN(earnN) || earnN < 0)) {
+      setError('Earn rate must be a number at or above 0, or blank.')
+      return
+    }
+    if (usdN != null && (Number.isNaN(usdN) || usdN < 0)) {
+      setError('USD per point must be a number at or above 0, or blank.')
+      return
+    }
+    if (minN != null && (Number.isNaN(minN) || minN < 0)) {
+      setError('Minimum redeem points must be a number at or above 0, or blank.')
+      return
+    }
+    if (expN != null && (Number.isNaN(expN) || expN <= 0 || !Number.isInteger(expN))) {
+      setError('Expiry days must be a positive whole number, or blank.')
+      return
+    }
+    saveMutation.mutate({
+      loyalty_earn_per_usd: earnN,
+      loyalty_usd_per_point: usdN,
+      loyalty_min_redeem_points: minN,
+      loyalty_expire_days: expN,
+      clear_loyalty_earn: earnN == null,
+      clear_loyalty_redeem: usdN == null,
+      clear_loyalty_min: minN == null,
+      clear_loyalty_expire: expN == null,
+    })
+  }
+
+  return (
+    <form
+      onSubmit={onSave}
+      className="max-w-xl space-y-4 rounded-dentaflow border border-line bg-surface p-5 text-sm"
+    >
+      <div>
+        <h2 className="font-display text-base font-bold">Loyalty points</h2>
+        <p className="mt-1 text-xs text-muted">
+          Leave fields blank until the clinic confirms rates. Earn uses paid amount excluding VAT.
+        </p>
+      </div>
+      {error ? <p className="text-xs text-status-red">{error}</p> : null}
+      {info ? <p className="text-xs text-status-green">{info}</p> : null}
+      <label className="block space-y-1">
+        <span className="text-xs font-bold">Points earned per $1 USD spent (ex-VAT)</span>
+        <input
+          type="number"
+          min="0"
+          step="0.01"
+          value={earn}
+          onChange={(e) => setEarn(e.target.value)}
+          placeholder="Blank until confirmed"
+          className="h-10 w-full rounded-dentaflow border border-line bg-canvas px-3 font-mono"
+        />
+      </label>
+      <label className="block space-y-1">
+        <span className="text-xs font-bold">USD value per point (redeem)</span>
+        <input
+          type="number"
+          min="0"
+          step="0.0001"
+          value={usdPerPoint}
+          onChange={(e) => setUsdPerPoint(e.target.value)}
+          placeholder="Blank until confirmed"
+          className="h-10 w-full rounded-dentaflow border border-line bg-canvas px-3 font-mono"
+        />
+      </label>
+      <label className="block space-y-1">
+        <span className="text-xs font-bold">Minimum points to redeem</span>
+        <input
+          type="number"
+          min="0"
+          step="1"
+          value={minRedeem}
+          onChange={(e) => setMinRedeem(e.target.value)}
+          placeholder="Blank = no minimum"
+          className="h-10 w-full rounded-dentaflow border border-line bg-canvas px-3 font-mono"
+        />
+      </label>
+      <label className="block space-y-1">
+        <span className="text-xs font-bold">Optional expiry (days after earn)</span>
+        <input
+          type="number"
+          min="1"
+          step="1"
+          value={expireDays}
+          onChange={(e) => setExpireDays(e.target.value)}
+          placeholder="Blank = no expiry"
+          className="h-10 w-full rounded-dentaflow border border-line bg-canvas px-3 font-mono"
+        />
+      </label>
+      <div className="flex justify-end">
+        <button
+          type="submit"
+          disabled={saveMutation.isPending}
+          className="rounded-dentaflow bg-marine px-4 py-2 text-xs font-bold text-white disabled:opacity-60"
+        >
+          Save loyalty parameters
+        </button>
+      </div>
+    </form>
   )
 }
 
