@@ -42,6 +42,23 @@ export type StockMovementType =
   | 'transfer_out'
   | 'transfer_in'
 
+export type AppointmentStatus =
+  | 'scheduled'
+  | 'confirmed'
+  | 'completed'
+  | 'cancelled'
+  | 'no_show'
+
+export type MessageCategory = 'utility' | 'marketing'
+
+export type TemplateApprovalStatus = 'draft' | 'pending' | 'approved' | 'rejected'
+
+export type QueueStatus = 'pending' | 'processing' | 'sent' | 'failed' | 'cancelled'
+
+export type LogDirection = 'outbound' | 'inbound'
+
+export type LogStatus = 'queued' | 'sent' | 'delivered' | 'read' | 'failed' | 'replied'
+
 export type Database = {
   dental: {
     Tables: {
@@ -860,7 +877,15 @@ export type Database = {
           notes?: string | null
           completed_at?: string | null
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: 'stock_counts_branch_id_fkey'
+            columns: ['branch_id']
+            isOneToOne: false
+            referencedRelation: 'branches'
+            referencedColumns: ['id']
+          },
+        ]
       }
       stock_count_lines: {
         Row: {
@@ -883,7 +908,22 @@ export type Database = {
           system_qty?: number
           counted_qty?: number | null
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: 'stock_count_lines_stock_count_id_fkey'
+            columns: ['stock_count_id']
+            isOneToOne: false
+            referencedRelation: 'stock_counts'
+            referencedColumns: ['id']
+          },
+          {
+            foreignKeyName: 'stock_count_lines_item_id_fkey'
+            columns: ['item_id']
+            isOneToOne: false
+            referencedRelation: 'items'
+            referencedColumns: ['id']
+          },
+        ]
       }
       import_batches: {
         Row: {
@@ -915,7 +955,15 @@ export type Database = {
           confirmed_at?: string | null
           reverted_at?: string | null
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: 'import_batches_branch_id_fkey'
+            columns: ['branch_id']
+            isOneToOne: false
+            referencedRelation: 'branches'
+            referencedColumns: ['id']
+          },
+        ]
       }
       import_rows: {
         Row: {
@@ -950,7 +998,15 @@ export type Database = {
           created_entity_id?: string | null
           created_action?: string | null
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: 'import_rows_batch_id_fkey'
+            columns: ['batch_id']
+            isOneToOne: false
+            referencedRelation: 'import_batches'
+            referencedColumns: ['id']
+          },
+        ]
       }
       promotions: {
         Row: {
@@ -1225,6 +1281,363 @@ export type Database = {
         }
         Relationships: []
       }
+      appointments: {
+        Row: {
+          id: string
+          branch_id: string
+          customer_id: string
+          dentist_id: string
+          service_id: string | null
+          start_at: string
+          end_at: string
+          status: AppointmentStatus
+          notes: string | null
+          sale_id: string | null
+          created_by: string | null
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          branch_id: string
+          customer_id: string
+          dentist_id: string
+          service_id?: string | null
+          start_at: string
+          end_at: string
+          status?: AppointmentStatus
+          notes?: string | null
+          sale_id?: string | null
+          created_by?: string | null
+          created_at?: string
+        }
+        Update: {
+          service_id?: string | null
+          start_at?: string
+          end_at?: string
+          status?: AppointmentStatus
+          notes?: string | null
+          sale_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: 'appointments_branch_id_fkey'
+            columns: ['branch_id']
+            isOneToOne: false
+            referencedRelation: 'branches'
+            referencedColumns: ['id']
+          },
+          {
+            foreignKeyName: 'appointments_customer_id_fkey'
+            columns: ['customer_id']
+            isOneToOne: false
+            referencedRelation: 'customers'
+            referencedColumns: ['id']
+          },
+          {
+            foreignKeyName: 'appointments_service_id_fkey'
+            columns: ['service_id']
+            isOneToOne: false
+            referencedRelation: 'services'
+            referencedColumns: ['id']
+          },
+        ]
+      }
+      returns: {
+        Row: {
+          id: string
+          branch_id: string
+          sale_id: string
+          return_number: string
+          restock: boolean
+          subtotal: number
+          tax_total: number
+          total: number
+          refund_total: number
+          reason: string | null
+          notes: string | null
+          created_by: string | null
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          branch_id: string
+          sale_id: string
+          return_number: string
+          restock?: boolean
+          subtotal: number
+          tax_total: number
+          total: number
+          refund_total?: number
+          reason?: string | null
+          notes?: string | null
+          created_by?: string | null
+          created_at?: string
+        }
+        Update: {
+          restock?: boolean
+          reason?: string | null
+          notes?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: 'returns_sale_id_fkey'
+            columns: ['sale_id']
+            isOneToOne: false
+            referencedRelation: 'sales'
+            referencedColumns: ['id']
+          },
+          {
+            foreignKeyName: 'returns_branch_id_fkey'
+            columns: ['branch_id']
+            isOneToOne: false
+            referencedRelation: 'branches'
+            referencedColumns: ['id']
+          },
+        ]
+      }
+      return_lines: {
+        Row: {
+          id: string
+          return_id: string
+          sale_line_id: string
+          qty: number
+          unit_price: number
+          tax_rate: number
+          tax_amount: number
+          line_net: number
+          line_gross: number
+          restocked: boolean
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          return_id: string
+          sale_line_id: string
+          qty: number
+          unit_price: number
+          tax_rate: number
+          tax_amount: number
+          line_net: number
+          line_gross: number
+          restocked?: boolean
+          created_at?: string
+        }
+        Update: {
+          qty?: number
+          restocked?: boolean
+        }
+        Relationships: [
+          {
+            foreignKeyName: 'return_lines_return_id_fkey'
+            columns: ['return_id']
+            isOneToOne: false
+            referencedRelation: 'returns'
+            referencedColumns: ['id']
+          },
+          {
+            foreignKeyName: 'return_lines_sale_line_id_fkey'
+            columns: ['sale_line_id']
+            isOneToOne: false
+            referencedRelation: 'sale_lines'
+            referencedColumns: ['id']
+          },
+        ]
+      }
+      return_refunds: {
+        Row: {
+          id: string
+          return_id: string
+          tender: PaymentTender
+          amount: number
+          reference: string | null
+          created_by: string | null
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          return_id: string
+          tender: PaymentTender
+          amount: number
+          reference?: string | null
+          created_by?: string | null
+          created_at?: string
+        }
+        Update: {
+          amount?: number
+          reference?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: 'return_refunds_return_id_fkey'
+            columns: ['return_id']
+            isOneToOne: false
+            referencedRelation: 'returns'
+            referencedColumns: ['id']
+          },
+        ]
+      }
+      message_templates: {
+        Row: {
+          id: string
+          kind: string
+          language: WhatsAppLanguage
+          name: string
+          category: MessageCategory
+          body_text: string
+          variables: unknown
+          whatsapp_template_id: string | null
+          status: TemplateApprovalStatus
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          kind: string
+          language: WhatsAppLanguage
+          name: string
+          category?: MessageCategory
+          body_text: string
+          variables?: unknown
+          whatsapp_template_id?: string | null
+          status?: TemplateApprovalStatus
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          name?: string
+          category?: MessageCategory
+          body_text?: string
+          variables?: unknown
+          whatsapp_template_id?: string | null
+          status?: TemplateApprovalStatus
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      notification_queue: {
+        Row: {
+          id: string
+          branch_id: string
+          customer_id: string | null
+          phone: string
+          language: WhatsAppLanguage
+          template_id: string
+          kind: string
+          params: Record<string, unknown>
+          scheduled_at: string
+          status: QueueStatus
+          attempts: number
+          last_error: string | null
+          related_type: string | null
+          related_id: string | null
+          created_by: string | null
+          created_at: string
+          sent_at: string | null
+        }
+        Insert: {
+          id?: string
+          branch_id: string
+          customer_id?: string | null
+          phone: string
+          language: WhatsAppLanguage
+          template_id: string
+          kind: string
+          params?: Record<string, unknown>
+          scheduled_at?: string
+          status?: QueueStatus
+          attempts?: number
+          last_error?: string | null
+          related_type?: string | null
+          related_id?: string | null
+          created_by?: string | null
+          created_at?: string
+          sent_at?: string | null
+        }
+        Update: {
+          status?: QueueStatus
+          attempts?: number
+          last_error?: string | null
+          sent_at?: string | null
+          scheduled_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: 'notification_queue_branch_id_fkey'
+            columns: ['branch_id']
+            isOneToOne: false
+            referencedRelation: 'branches'
+            referencedColumns: ['id']
+          },
+          {
+            foreignKeyName: 'notification_queue_customer_id_fkey'
+            columns: ['customer_id']
+            isOneToOne: false
+            referencedRelation: 'customers'
+            referencedColumns: ['id']
+          },
+          {
+            foreignKeyName: 'notification_queue_template_id_fkey'
+            columns: ['template_id']
+            isOneToOne: false
+            referencedRelation: 'message_templates'
+            referencedColumns: ['id']
+          },
+        ]
+      }
+      notification_log: {
+        Row: {
+          id: string
+          queue_id: string | null
+          branch_id: string | null
+          direction: LogDirection
+          phone: string
+          language: WhatsAppLanguage | null
+          kind: string | null
+          status: LogStatus
+          body_preview: string | null
+          payload: Record<string, unknown>
+          provider_message_id: string | null
+          error_message: string | null
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          queue_id?: string | null
+          branch_id?: string | null
+          direction?: LogDirection
+          phone: string
+          language?: WhatsAppLanguage | null
+          kind?: string | null
+          status: LogStatus
+          body_preview?: string | null
+          payload?: Record<string, unknown>
+          provider_message_id?: string | null
+          error_message?: string | null
+          created_at?: string
+        }
+        Update: {
+          status?: LogStatus
+          body_preview?: string | null
+          provider_message_id?: string | null
+          error_message?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: 'notification_log_queue_id_fkey'
+            columns: ['queue_id']
+            isOneToOne: false
+            referencedRelation: 'notification_queue'
+            referencedColumns: ['id']
+          },
+          {
+            foreignKeyName: 'notification_log_branch_id_fkey'
+            columns: ['branch_id']
+            isOneToOne: false
+            referencedRelation: 'branches'
+            referencedColumns: ['id']
+          },
+        ]
+      }
     }
     Views: Record<string, never>
     Functions: {
@@ -1479,6 +1892,95 @@ export type Database = {
         Args: { p_phone: string }
         Returns: string
       }
+      create_branch_dentist: {
+        Args: {
+          p_branch_id: string
+          p_name: string
+          p_email: string
+          p_password?: string | null
+        }
+        Returns: string
+      }
+      create_appointment: {
+        Args: {
+          p_branch_id: string
+          p_customer_id: string
+          p_dentist_id: string
+          p_start_at: string
+          p_end_at?: string | null
+          p_service_id?: string | null
+          p_notes?: string | null
+        }
+        Returns: string
+      }
+      set_appointment_status: {
+        Args: {
+          p_appointment_id: string
+          p_status: AppointmentStatus
+        }
+        Returns: undefined
+      }
+      reschedule_appointment: {
+        Args: {
+          p_appointment_id: string
+          p_start_at: string
+          p_end_at?: string | null
+        }
+        Returns: undefined
+      }
+      complete_appointment: {
+        Args: {
+          p_appointment_id: string
+          p_lines?: unknown
+          p_payments?: unknown
+          p_notes?: string | null
+        }
+        Returns: string
+      }
+      enqueue_notification: {
+        Args: {
+          p_branch_id: string
+          p_kind: string
+          p_phone?: string | null
+          p_language?: WhatsAppLanguage | null
+          p_customer_id?: string | null
+          p_params?: unknown
+          p_scheduled_at?: string | null
+          p_related_type?: string | null
+          p_related_id?: string | null
+        }
+        Returns: string
+      }
+      cancel_queued_notification: {
+        Args: { p_queue_id: string }
+        Returns: undefined
+      }
+      simulate_whatsapp_delivery: {
+        Args: { p_queue_id: string; p_status?: string }
+        Returns: string
+      }
+      simulate_whatsapp_inbound: {
+        Args: { p_phone: string; p_body: string }
+        Returns: unknown
+      }
+      notify_sale_document: {
+        Args: { p_sale_id: string }
+        Returns: string | null
+      }
+      process_return: {
+        Args: {
+          p_branch_id: string
+          p_sale_id: string
+          p_lines: unknown
+          p_refunds?: unknown
+          p_restock?: boolean
+          p_reason?: string | null
+          p_notes?: string | null
+        }
+        Returns: string
+      }
+      can_manage_notifications: { Args: Record<string, never>; Returns: boolean }
+      can_manage_appointments: { Args: Record<string, never>; Returns: boolean }
     }
     Enums: {
       staff_role: StaffRole
@@ -1491,6 +1993,12 @@ export type Database = {
       price_list: PriceList
       purchase_status: PurchaseStatus
       stock_movement_type: StockMovementType
+      appointment_status: AppointmentStatus
+      message_category: MessageCategory
+      template_approval_status: TemplateApprovalStatus
+      queue_status: QueueStatus
+      log_direction: LogDirection
+      log_status: LogStatus
     }
     CompositeTypes: Record<string, never>
   }
