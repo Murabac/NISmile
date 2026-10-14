@@ -1,9 +1,8 @@
 import { useEffect, useRef, useState } from 'react'
-import { Building2, Check, ChevronDown, Menu, Moon, Sun } from 'lucide-react'
+import { Building2, Check, ChevronDown, Menu } from 'lucide-react'
 import { useLocation } from 'react-router-dom'
 import { useAuth } from '../lib/auth.tsx'
 import { roleLabel, screenByPath } from '../lib/navigation.ts'
-import { useTheme } from '../lib/theme.ts'
 
 type HeaderProps = {
   onOpenMenu: () => void
@@ -11,7 +10,6 @@ type HeaderProps = {
 
 export function Header({ onOpenMenu }: HeaderProps) {
   const { profile, branches, branchId, setBranchId, signOut } = useAuth()
-  const { isDark, toggle } = useTheme()
   const location = useLocation()
   const screen = screenByPath(location.pathname)
   const allowAll = Boolean(
@@ -93,15 +91,6 @@ export function Header({ onOpenMenu }: HeaderProps) {
       </div>
 
       <div className="flex items-center gap-2">
-        <button
-          type="button"
-          onClick={toggle}
-          aria-pressed={isDark}
-          className="rounded-dentaflow border border-line p-2 text-main"
-          aria-label={isDark ? 'Switch to light mode' : 'Switch to dark mode'}
-        >
-          {isDark ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
-        </button>
         <div className="relative" ref={userRef}>
           <button
             type="button"

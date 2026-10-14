@@ -3,11 +3,9 @@ import { Navigate } from 'react-router-dom'
 import { Logo } from '../components/Logo.tsx'
 import { useAuth } from '../lib/auth.tsx'
 import { demoAccounts, type DemoAccount } from '../lib/demoAccounts.ts'
-import { useTheme } from '../lib/theme.ts'
 
 export function LoginPage() {
   const { session, signIn, signUp } = useAuth()
-  const { isDark, toggle } = useTheme()
   const [mode, setMode] = useState<'sign-in' | 'create'>('sign-in')
   const [name, setName] = useState('')
   const [email, setEmail] = useState('')
@@ -46,25 +44,16 @@ export function LoginPage() {
   return (
     <main className="flex min-h-screen items-center justify-center bg-canvas px-4 py-8 text-main">
       <div className="w-full max-w-md rounded-dentaflow border border-line bg-surface p-6">
-        <div className="mb-6 flex items-center justify-between gap-3">
-          <div className="flex min-w-0 items-center gap-2.5">
-            <Logo size="md" />
-            <div className="min-w-0 leading-tight">
-              <p className="font-display text-base font-extrabold tracking-tight text-marine dark:text-[#E8F2F0]">
-                N.I SMILE
-              </p>
-              <p className="truncate text-[10px] font-medium tracking-[0.04em] text-muted uppercase">
-                Oral care & Teeth whitening
-              </p>
-            </div>
+        <div className="mb-6 flex items-center gap-2.5">
+          <Logo size="md" />
+          <div className="min-w-0 leading-tight">
+            <p className="font-display text-base font-extrabold tracking-tight text-marine dark:text-[#E8F2F0]">
+              N.I SMILE
+            </p>
+            <p className="truncate text-[10px] font-medium tracking-[0.04em] text-muted uppercase">
+              Oral care & Teeth whitening
+            </p>
           </div>
-          <button
-            type="button"
-            onClick={toggle}
-            className="shrink-0 rounded-dentaflow border border-line px-3 py-1.5 text-xs font-semibold"
-          >
-            {isDark ? 'Light' : 'Dark'}
-          </button>
         </div>
         <h1 className="text-2xl font-semibold">{mode === 'sign-in' ? 'Sign in' : 'Create account'}</h1>
         <p className="mt-1 text-sm text-muted">
