@@ -22,6 +22,20 @@ const MONEY_KEYS = new Set([
   'discount',
   'net',
   'gross',
+  'inventory',
+  'accounts_receivable',
+  'total_assets',
+  'vat_liability',
+  'loyalty_liability',
+  'total_liabilities',
+  'equity_net_position',
+  'total_amount',
+  'operating_expenses',
+  'operating_profit',
+  'cash',
+  'zaad',
+  'edahab',
+  'mycash',
 ])
 
 export function humanizeKey(key: string): string {
@@ -66,6 +80,9 @@ export function reportSubtitle(input: {
     input.startsAt && input.endsAt
       ? `${new Date(input.startsAt).toLocaleDateString('en-US')} – ${new Date(input.endsAt).toLocaleDateString('en-US')}`
       : period
+  if (input.period === 'custom') {
+    return `${input.branchLabel} · Custom · ${range} · USD`
+  }
   return `${input.branchLabel} · ${period} · ${range} · USD`
 }
 

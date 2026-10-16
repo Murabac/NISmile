@@ -17,10 +17,22 @@ import {
 const REPORT_TYPES = Object.keys(REPORT_LABELS) as ReportType[]
 const PERIODS = Object.keys(PERIOD_LABELS) as ReportPeriod[]
 
+function isoDate(d: Date) {
+  const pad = (n: number) => String(n).padStart(2, '0')
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`
+}
+
+function defaultFromDate() {
+  const d = new Date()
+  return isoDate(new Date(d.getFullYear(), d.getMonth(), 1))
+}
+
 export function ReportsPage() {
   const { branchId, branches, profile } = useAuth()
   const [reportType, setReportType] = useState<ReportType>('sales')
   const [period, setPeriod] = useState<ReportPeriod>('mtd')
+  const [fromDate, setFromDate] = useState(defaultFromDate)
+  const [toDate, setToDate] = useState(() => isoDate(new Date()))
   const [printOpen, setPrintOpen] = useState(false)
   const [exporting, setExporting] = useState(false)
   const [exportError, setExportError] = useState<string | null>(null)
@@ -28,14 +40,20 @@ export function ReportsPage() {
   const canAll = profile?.role === 'owner'
   const effectiveBranch = branchId === 'all' && !canAll ? branches[0]?.id ?? 'all' : branchId
 
+  const customRangeValid =
+    period !== 'custom' || (Boolean(fromDate) && Boolean(toDate) && fromDate <= toDate)
+
   const reportQuery = useQuery({
-    queryKey: ['report', reportType, effectiveBranch, period],
+    queryKey: ['report', reportType, effectiveBranch, period, fromDate, toDate],
     queryFn: () =>
       runReport({
         type: reportType,
         branchId: effectiveBranch,
         period,
+        fromDate: period === 'custom' ? fromDate : null,
+        toDate: period === 'custom' ? toDate : null,
       }),
+    enabled: customRangeValid,
   })
 
   const data = reportQuery.data
@@ -91,6 +109,33 @@ export function ReportsPage() {
         { label: 'Sales', value: String(totals.sale_count ?? 0) },
       ]
     }
+    if (reportType === 'balance_sheet') {
+      return [
+        { label: 'Total assets', value: formatMoney(Number(totals.total_assets ?? 0)) },
+        { label: 'Total liabilities', value: formatMoney(Number(totals.total_liabilities ?? 0)) },
+        { label: 'Equity (net)', value: formatMoney(Number(totals.equity_net_position ?? 0)) },
+      ]
+    }
+    if (reportType === 'expenses') {
+      return [
+        { label: 'Total expenses', value: formatMoney(Number(totals.total_amount ?? 0)) },
+        { label: 'Count', value: String(totals.expense_count ?? 0) },
+        { label: 'Cash paid', value: formatMoney(Number(totals.cash ?? 0)) },
+      ]
+    }
+    if (reportType === 'pnl') {
+      return [
+        { label: 'Revenue ex-VAT', value: formatMoney(Number(totals.revenue_ex_vat ?? 0)) },
+        {
+          label: 'Operating expenses',
+          value: formatMoney(Number(totals.operating_expenses ?? 0)),
+        },
+        {
+          label: 'Operating profit',
+          value: formatMoney(Number(totals.operating_profit ?? 0)),
+        },
+      ]
+    }
     return [
       { label: 'Redemptions', value: String(totals.redemptions ?? 0) },
       { label: 'Discount given', value: formatMoney(Number(totals.discount_given ?? 0)) },
@@ -124,7 +169,7 @@ export function ReportsPage() {
             Reports
           </h1>
           <p className="text-xs text-muted">
-            Sales, profit, stock, expiry, debts, VAT, and promotions · {branchLabel} · USD
+            Sales, profit, expenses, P&L, stock, debts, VAT, and more · {branchLabel} · USD
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
@@ -168,25 +213,52 @@ export function ReportsPage() {
             </button>
           ))}
         </div>
-        <div className="flex flex-wrap items-center justify-between gap-2 border-t border-line pt-2 text-xs">
-          <div className="flex items-center gap-1">
-            <span className="font-semibold">Period:</span>
-            {PERIODS.map((p) => (
-              <button
-                key={p}
-                type="button"
-                onClick={() => setPeriod(p)}
-                className={`rounded px-2 py-1 font-mono text-[11px] font-bold uppercase ${
-                  period === p
-                    ? 'bg-flow-teal/15 text-marine dark:text-[#2CC7BF]'
-                    : 'text-muted'
-                }`}
-              >
-                {PERIOD_LABELS[p]}
-              </button>
-            ))}
+        <div className="flex flex-col gap-2 border-t border-line pt-2 text-xs">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <div className="flex flex-wrap items-center gap-1">
+              <span className="font-semibold">Period:</span>
+              {PERIODS.map((p) => (
+                <button
+                  key={p}
+                  type="button"
+                  onClick={() => setPeriod(p)}
+                  className={`rounded px-2 py-1 font-mono text-[11px] font-bold uppercase ${
+                    period === p
+                      ? 'bg-flow-teal/15 text-marine dark:text-[#2CC7BF]'
+                      : 'text-muted'
+                  }`}
+                >
+                  {PERIOD_LABELS[p]}
+                </button>
+              ))}
+            </div>
+            <span className="font-mono text-[11px] text-muted">Currency: USD</span>
           </div>
-          <span className="font-mono text-[11px] text-muted">Currency: USD</span>
+          {period === 'custom' ? (
+            <div className="flex flex-wrap items-end gap-3">
+              <label className="font-semibold">
+                From
+                <input
+                  type="date"
+                  value={fromDate}
+                  onChange={(e) => setFromDate(e.target.value)}
+                  className="mt-1 block h-9 rounded-dentaflow border border-line bg-canvas px-2 font-mono font-normal"
+                />
+              </label>
+              <label className="font-semibold">
+                To
+                <input
+                  type="date"
+                  value={toDate}
+                  onChange={(e) => setToDate(e.target.value)}
+                  className="mt-1 block h-9 rounded-dentaflow border border-line bg-canvas px-2 font-mono font-normal"
+                />
+              </label>
+              {!customRangeValid ? (
+                <p className="pb-2 text-status-red">Choose a valid from / to range.</p>
+              ) : null}
+            </div>
+          ) : null}
         </div>
       </div>
 

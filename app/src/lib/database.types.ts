@@ -5,7 +5,7 @@ export type StaffRole =
   | 'dentist'
   | 'storekeeper'
 
-export type WhatsAppLanguage = 'so' | 'ar' | 'en'
+export type WhatsAppLanguage = 'en'
 
 export type PriceList = 'retail' | 'wholesale'
 
@@ -30,6 +30,8 @@ export type ImportRowStatus = 'pending' | 'ok' | 'error' | 'applied' | 'reverted
 export type PaymentTender = 'cash' | 'zaad' | 'edahab' | 'mycash'
 
 export type SaleStatus = 'partial' | 'paid' | 'void'
+
+export type ExpenseStatus = 'posted' | 'void'
 
 export type SaleLineType = 'item' | 'service'
 
@@ -561,6 +563,95 @@ export type Database = {
           active?: boolean
         }
         Relationships: []
+      }
+      expense_categories: {
+        Row: {
+          id: string
+          code: string
+          name: string
+          active: boolean
+          sort_order: number
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          code: string
+          name: string
+          active?: boolean
+          sort_order?: number
+          created_at?: string
+        }
+        Update: {
+          code?: string
+          name?: string
+          active?: boolean
+          sort_order?: number
+        }
+        Relationships: []
+      }
+      expenses: {
+        Row: {
+          id: string
+          branch_id: string
+          category_id: string
+          expense_number: string
+          expense_date: string
+          amount: number
+          tender: PaymentTender
+          payee: string | null
+          reference: string | null
+          notes: string | null
+          status: ExpenseStatus
+          created_by: string | null
+          created_at: string
+          voided_by: string | null
+          voided_at: string | null
+        }
+        Insert: {
+          id?: string
+          branch_id: string
+          category_id: string
+          expense_number: string
+          expense_date?: string
+          amount: number
+          tender: PaymentTender
+          payee?: string | null
+          reference?: string | null
+          notes?: string | null
+          status?: ExpenseStatus
+          created_by?: string | null
+          created_at?: string
+          voided_by?: string | null
+          voided_at?: string | null
+        }
+        Update: {
+          category_id?: string
+          expense_date?: string
+          amount?: number
+          tender?: PaymentTender
+          payee?: string | null
+          reference?: string | null
+          notes?: string | null
+          status?: ExpenseStatus
+          voided_by?: string | null
+          voided_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: 'expenses_branch_id_fkey'
+            columns: ['branch_id']
+            isOneToOne: false
+            referencedRelation: 'branches'
+            referencedColumns: ['id']
+          },
+          {
+            foreignKeyName: 'expenses_category_id_fkey'
+            columns: ['category_id']
+            isOneToOne: false
+            referencedRelation: 'expense_categories'
+            referencedColumns: ['id']
+          },
+        ]
       }
       purchase_orders: {
         Row: {
@@ -1762,6 +1853,8 @@ export type Database = {
           p_report_type: string
           p_branch_id?: string | null
           p_period?: string
+          p_from_date?: string | null
+          p_to_date?: string | null
         }
         Returns: unknown
       }
@@ -1937,6 +2030,13 @@ export type Database = {
         }
         Returns: string
       }
+      link_appointment_sale: {
+        Args: {
+          p_appointment_id: string
+          p_sale_id: string
+        }
+        Returns: undefined
+      }
       enqueue_notification: {
         Args: {
           p_branch_id: string
@@ -1981,6 +2081,32 @@ export type Database = {
       }
       can_manage_notifications: { Args: Record<string, never>; Returns: boolean }
       can_manage_appointments: { Args: Record<string, never>; Returns: boolean }
+      can_manage_expenses: { Args: Record<string, never>; Returns: boolean }
+      create_expense: {
+        Args: {
+          p_branch_id: string
+          p_category_id: string
+          p_amount: number
+          p_tender: string
+          p_expense_date?: string
+          p_payee?: string | null
+          p_reference?: string | null
+          p_notes?: string | null
+        }
+        Returns: string
+      }
+      void_expense: {
+        Args: { p_expense_id: string }
+        Returns: undefined
+      }
+      report_expenses: {
+        Args: { p_branch_id?: string | null; p_period?: string }
+        Returns: unknown
+      }
+      report_pnl: {
+        Args: { p_branch_id?: string | null; p_period?: string }
+        Returns: unknown
+      }
     }
     Enums: {
       staff_role: StaffRole
@@ -1999,6 +2125,7 @@ export type Database = {
       queue_status: QueueStatus
       log_direction: LogDirection
       log_status: LogStatus
+      expense_status: ExpenseStatus
     }
     CompositeTypes: Record<string, never>
   }

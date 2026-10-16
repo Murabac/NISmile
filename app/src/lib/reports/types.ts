@@ -6,8 +6,11 @@ export type ReportType =
   | 'debts'
   | 'vat'
   | 'promos'
+  | 'balance_sheet'
+  | 'expenses'
+  | 'pnl'
 
-export type ReportPeriod = 'today' | '7d' | '30d' | 'mtd' | 'ytd'
+export type ReportPeriod = 'today' | '7d' | '30d' | 'mtd' | 'ytd' | 'custom'
 
 export type ReportResult = {
   report: ReportType | string
@@ -65,7 +68,7 @@ export type GoLiveStatus = {
     utility_approved: number
     marketing_draft: number
     marketing_approved: number
-    by_language: { so: number; ar: number; en: number }
+    by_language: { en: number }
   }
   updated_at: string
 }
@@ -78,6 +81,9 @@ export const REPORT_LABELS: Record<ReportType, string> = {
   debts: 'Wholesale receivables',
   vat: 'VAT ledger',
   promos: 'Promotion results',
+  balance_sheet: 'Balance Sheet',
+  expenses: 'Expenses',
+  pnl: 'Profit & loss',
 }
 
 export const PERIOD_LABELS: Record<ReportPeriod, string> = {
@@ -86,4 +92,5 @@ export const PERIOD_LABELS: Record<ReportPeriod, string> = {
   '30d': '30d',
   mtd: 'MTD',
   ytd: 'YTD',
+  custom: 'Custom',
 }

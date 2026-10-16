@@ -434,7 +434,7 @@ function GoLivePanel({ queryClient }: { queryClient: ReturnType<typeof useQueryC
               onChange={() => toggle('roles_trained')}
             />
             <CheckRow
-              label="Somali / Arabic / English templates reviewed"
+              label="English WhatsApp templates reviewed"
               checked={Boolean(checklist.templates_reviewed)}
               onChange={() => toggle('templates_reviewed')}
             />
@@ -484,8 +484,7 @@ function GoLivePanel({ queryClient }: { queryClient: ReturnType<typeof useQueryC
             <Stat label="Marketing approved" value={templates.marketing_approved} />
           </dl>
           <p className="mt-3 font-mono text-[11px] text-muted">
-            Languages · so {templates.by_language.so} · ar {templates.by_language.ar} · en{' '}
-            {templates.by_language.en}
+            English templates · {templates.by_language.en}
           </p>
         </div>
       ) : null}

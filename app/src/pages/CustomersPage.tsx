@@ -63,7 +63,6 @@ export function CustomersPage() {
   const [phone, setPhone] = useState('')
   const [customerType, setCustomerType] = useState<CustomerType>('retail')
   const [subtype, setSubtype] = useState<WholesaleSubtype>('clinic')
-  const [language, setLanguage] = useState<'so' | 'ar' | 'en'>('so')
   const [whatsappOptIn, setWhatsappOptIn] = useState(true)
   const [creditLimit, setCreditLimit] = useState('1000')
   const [notes, setNotes] = useState('')
@@ -151,7 +150,6 @@ export function CustomersPage() {
     setPhone('')
     setCustomerType(tab)
     setSubtype('clinic')
-    setLanguage('so')
     setWhatsappOptIn(true)
     setCreditLimit(tab === 'wholesale' ? '1000' : '')
     setNotes('')
@@ -165,7 +163,6 @@ export function CustomersPage() {
     setPhone(customer.phone ?? '')
     setCustomerType(customer.customer_type)
     setSubtype((customer.subtype as WholesaleSubtype) || 'clinic')
-    setLanguage(customer.language)
     setWhatsappOptIn(customer.whatsapp_opt_in)
     setCreditLimit(customer.credit_limit == null ? '' : String(customer.credit_limit))
     setNotes(customer.notes ?? '')
@@ -190,7 +187,7 @@ export function CustomersPage() {
       phone: phone || null,
       customer_type: customerType,
       subtype: customerType === 'wholesale' ? subtype : null,
-      language,
+      language: 'en',
       whatsapp_opt_in: whatsappOptIn,
       credit_limit:
         customerType === 'wholesale' && creditLimit !== '' ? Number(creditLimit) : null,
@@ -316,7 +313,7 @@ export function CustomersPage() {
                       </div>
                     ) : (
                       <p className="text-[11px] font-semibold text-muted uppercase">
-                        {customer.language}
+                        {customer.whatsapp_opt_in ? 'WhatsApp' : 'No WA'}
                       </p>
                     )}
                   </div>
@@ -336,8 +333,7 @@ export function CustomersPage() {
                 <p className="text-xs text-muted">
                   {selected.customer_type}
                   {selected.subtype ? ` · ${selected.subtype}` : ''} ·{' '}
-                  {selected.phone ?? 'No phone'} · WhatsApp{' '}
-                  {selected.language.toUpperCase()} · Points{' '}
+                  {selected.phone ?? 'No phone'} · Points{' '}
                   <span className="font-mono font-bold">{selected.loyalty_points ?? 0}</span>
                 </p>
                 <p className="mt-1 text-[11px] font-semibold">
@@ -628,20 +624,6 @@ export function CustomersPage() {
               </label>
             </>
           ) : null}
-          <label className="block text-sm font-semibold">
-            WhatsApp language
-            <select
-              value={language}
-              onChange={(event) =>
-                setLanguage(event.target.value as 'so' | 'ar' | 'en')
-              }
-              className="mt-1 h-10 w-full rounded-dentaflow border border-line bg-canvas px-3 font-normal"
-            >
-              <option value="so">Somali</option>
-              <option value="ar">Arabic</option>
-              <option value="en">English</option>
-            </select>
-          </label>
           <label className="flex items-center gap-2 text-sm font-semibold">
             <input
               type="checkbox"
@@ -649,7 +631,7 @@ export function CustomersPage() {
               onChange={(event) => setWhatsappOptIn(event.target.checked)}
               className="rounded border-line"
             />
-            WhatsApp opt-in
+            WhatsApp opt-in (English messages)
           </label>
           <label className="block text-sm font-semibold">
             Notes

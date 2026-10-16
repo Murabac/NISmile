@@ -2,7 +2,7 @@
 
 This file is the map for building DentaFlow. The product spec is `DentaFlow-Project-Plan-v2.md`. The look and screen behavior come from `Design Ref/`. Logos live in `Brand/`.
 
-**Current step:** Phase 5 complete; owner branch admin added. Apply `20261015010000_dental_branch_admin.sql` for `delete_branch`. Settings → Branches: create, edit, activate/deactivate, delete (hard delete if unused; otherwise deactivate). Reports/dashboard still from step 26–28. **Convention:** every build step includes sample seed SQL for new data only, and skips domains that already have seed data. Step 6 stays parallel. Credentials stay in Edge secrets / `app/.env.local`. Do not invent the VAT percentage, loyalty rates, a MyCash account number, or WhatsApp credentials.
+**Current step:** Expenses + P&L reports added. Apply `20261017040000_dental_expenses.sql` (and prior pending migrations: appointment POS, WhatsApp English-only, balance sheet). Step 6: submit **English** Meta templates (`en_US`). Credentials stay in Edge secrets / `app/.env.local`. Do not invent the VAT percentage, loyalty rates, a MyCash account number, or WhatsApp credentials.
 
 ## What this repo is
 
@@ -23,10 +23,11 @@ DentaFlow is a multi-branch dental clinic system: inventory, retail and wholesal
 - **Name:** DentaFlow is the staff app. The clinic is N.I SMILE. GitHub remote: https://github.com/Murabac/NISmile.git on `main`. Do not commit `app/.env.local`.
 - **Currency:** USD only. Store money as `numeric(12,2)`. No exchange rates.
 - **Staff app language:** English only. No language switcher, no translated screens, no RTL layout. Section 3.8 of the plan and the prototype's language switcher are superseded.
-- **WhatsApp languages:** message content is **Somali, Arabic, and English** (`so` / `ar` / `en`). Each customer has a preferred message language. The sender picks that template. Staff UI stays English-only (no screen translation / no RTL switcher).
+- **WhatsApp languages:** message content is **English only**. Meta Cloud API template language is always **`en_US`**. `customers.language` is forced to `en` (so/ar enum values unused). No customer language picker. Staff UI stays English-only (no screen translation / no RTL switcher).
 - **Branches:** Schema supports many branches. Owner manages them in **Settings → Branches** (create, edit, deactivate, delete). **Seed one branch** for go-live. Owners can view all branches once more exist. Everyone else is limited to their branches.
 - **Shared across branches:** items, services, price lists, tax rates.
-- **Per branch:** customers (patients and wholesale), stock, sales, appointments, purchases, cash. A customer record belongs to one branch.
+- **Per branch:** customers (patients and wholesale), stock, sales, appointments, purchases, expenses, cash. A customer record belongs to one branch.
+- **Expenses:** branch operating costs (rent, utilities, salaries, etc.) paid with Cash / Zaad / eDahab / MyCash. Posted or void. Categories are shared. Owner / branch manager / receptionist can record.
 - **Wholesale:** staff enter orders. Buyer subtypes: clinic, pharmacy/shop, lab, individual dentist. Credit limit, due date, statement.
 - **Stock:** one ledger. Never edit quantity in place. Deduct batches with FEFO (first expiry first).
 - **Checkout:** sale, VAT, promotion, points, and stock deduction run in one database transaction.
@@ -69,8 +70,8 @@ Copy these tokens from `Design Ref/src/index.css`.
 - **Direction:** the staff app stays left-to-right. Do not set `dir="rtl"` and do not build a mirrored layout.
 - **Staff logo:** `Brand/dentaflow-logo.svg` for the wordmark and `Brand/dentaflow-icon.svg` for the app icon and favicon. Do not redraw the tooth from `Design Ref`, and do not use `Brand/nismile-logo.jpg` in the staff app.
 - **Shell:** fixed marine sidebar (`lg:ms-64` is fine as spacing from the sidebar), header with branch switcher, dark toggle, notification count. No language switcher. Mobile sidebar is a drawer. Content max width `max-w-7xl`.
-- **Screens and nav order** match `Design Ref/src/components/common/Sidebar.tsx`, plus **Sales** (branch sale history for documents/returns) after Point of Sale: Dashboard, Point of Sale (highlighted), Sales, Stock, Transfers, Purchases, Services, Customers, Appointments, Promotions (coral), WhatsApp, Reports, Import, Settings.
-- **English labels** are written in the components. `Design Ref/src/i18n/translations.ts` is not the app catalog. Somali and Arabic strings belong on WhatsApp templates.
+- **Screens and nav order** match `Design Ref/src/components/common/Sidebar.tsx`, plus **Sales** after Point of Sale and **Expenses** after Purchases: Dashboard, Point of Sale (highlighted), Sales, Stock, Transfers, Purchases, Expenses, Services, Customers, Appointments, Promotions (coral), WhatsApp, Reports, Import, Settings.
+- **English labels** are written in the components. `Design Ref/src/i18n/translations.ts` is not the app catalog. WhatsApp template bodies are English only.
 
 ### Prototype behavior to drop
 
@@ -104,8 +105,8 @@ Schema outline is section 4 of the plan. These rules are easy to get wrong:
 - Checkout: `checkout_sale` writes `sales` / `sale_lines` / `payments` in one transaction, then FEFO `sale_out` for items and `apply_service_recipe` per service unit. VAT from each line’s tax rate (0 if none). Tenders: Cash, Zaad, eDahab, MyCash. Partial payment → status `partial`. Promotions/points/documents later.
 - Wholesale: on-account is unpaid AR (not a fifth tender). Unpaid wholesale sales need `due_date` and a positive `credit_limit`. `customer_ar_balance` + `apply_customer_payment` settle open invoices FIFO.
 - Phone numbers are stored in international form (`+252…`).
-- `customers.language` is the WhatsApp language: `so`, `ar`, or `en`. It does not change the staff UI.
-- Item, service, and promotion names in the app are English. Somali, Arabic, and English WhatsApp wording is stored on the message template or campaign, not as a second set of screen labels.
+- `customers.language` is always `en` for WhatsApp. It does not change the staff UI.
+- Item, service, and promotion names in the app are English. WhatsApp wording is English on `message_templates` (language `en`) and `promotions.whatsapp_message_en`.
 
 ## Architecture
 
@@ -138,7 +139,7 @@ Work in order. Finish a step before starting the next one inside the same phase.
 3. **Theme.** Done. Tokens, fonts, dark mode, logo, 10px radius, and print hooks are in `app/`. Left-to-right layout. No language switcher.
 4. **Database.** Done. `dental` is exposed on project `iwnswhnoxbvgyqljfvel`. One branch is seeded. `profiles`, `user_branches`, and `customers` exist, with row-level security. The client is `app/src/lib/supabase.ts` and uses only the anon key. The first email signup becomes the owner.
 5. **Shell.** Done. Email sign-in and account creation, marine sidebar, header, branch switcher, and role-gated routes for the 13 screens. Owners can use All branches on Dashboard and Reports. Login has quick buttons for the five demo roles (`owner@nismile.local` through `storekeeper@nismile.local`, password `dentaflow-demo`). Re-seed with `node scripts/seed-demo-users.mjs` from `app/`. No in-app role switcher and no language switcher.
-6. **WhatsApp prep (human, in parallel).** Meta Business account, business verification, dedicated number. Submit Somali and Arabic templates. Not blocking UI work.
+6. **WhatsApp prep (human, in parallel).** Meta Business account, business verification, dedicated number. Submit **English** templates (`en_US`). Not blocking UI work.
 
 ### Phase 1 — Inventory and import (about 2–3 weeks)
 
@@ -160,21 +161,21 @@ Work in order. Finish a step before starting the next one inside the same phase.
 
 ### Phase 3 — Appointments and WhatsApp (about 2 weeks)
 
-19. **Patients and calendar.** Done once migration + seed are applied. Migration `20261014110000_dental_appointments.sql`: `appointments` + `create_appointment` / `set_appointment_status` / `complete_appointment` (complete → `checkout_sale` for the booked service). UI at `/appointments`: week calendar + list, book drawer (retail patients, dentist, service, so/ar on customer), status actions. Patients stay on Customers (Retail). Sample: Ayaan Abdi + today/tomorrow slots (`20261014111000_seed_appointments_sample.sql` / `node scripts/seed-appointments.mjs`). WhatsApp send is step 20+.
-20. **Queue.** Done once migration + seed are applied. Migration `20261014120000_dental_notification_queue.sql`: `message_templates` (so+ar per kind), `notification_queue`, `notification_log`, `enqueue_notification` / `cancel_queued_notification`. UI at `/whatsapp` (templates, queue, log). No Meta send yet — Cloud API credentials stay for Edge Functions. Sample: utility draft templates + one pending 24h reminder (`20261014121000_seed_notification_queue_sample.sql` / `node scripts/seed-notifications.mjs`).
-21. **Utility messages.** Done once migration + seed are applied. Migration `20261014130000_dental_utility_messages.sql`: booking → confirmation + 24h/2h reminders; cancel/no-show → cancel notice; `reschedule_appointment`; sales insert → receipt/invoice notice (opt-in only, so/ar). UI: Appointments reschedule + queue hints; documents “Queue WhatsApp notice”. Meta send still deferred. Sample: `20261014131000_seed_utility_messages_sample.sql` / `node scripts/seed-utility-messages.mjs`.
+19. **Patients and calendar.** Done once migration + seed are applied. Migration `20261014110000_dental_appointments.sql`: `appointments` + `create_appointment` / `set_appointment_status` / `complete_appointment` (legacy quick cash path kept in DB). Payment UX: **Checkout in POS** → `/pos?appointment=&customer=&service=` then `link_appointment_sale` (`20261017010000_dental_appointment_pos_checkout.sql`). UI at `/appointments`: week calendar + list, book drawer, status actions. Patients stay on Customers (Retail). Sample: Ayaan Abdi + today/tomorrow slots (`20261014111000_seed_appointments_sample.sql` / `node scripts/seed-appointments.mjs`). WhatsApp send is step 20+.
+20. **Queue.** Done. Migration `20261014120000_dental_notification_queue.sql` plus English-only cutover `20261017020000_dental_whatsapp_english_only.sql`: `message_templates` (English per kind), `notification_queue`, `notification_log`, `enqueue_notification` always picks `language = en`. UI at `/whatsapp`.
+21. **Utility messages.** Done. Booking → confirmation + 24h/2h reminders; cancel/no-show → cancel notice; `reschedule_appointment`; sales → receipt/invoice notice (opt-in, English).
 22. **Webhook.** Done once migration + function are applied. Migration `20261014140000_dental_whatsapp_webhook.sql`: delivery status, inbound reply `1`=confirm / `2`=cancel, opt-out keywords, simulate RPCs for local testing. Edge Function `supabase/functions/whatsapp-webhook` (GET verify + POST statuses/messages). UI: Simulate delivered / Reply 1·2 / Opt-out on WhatsApp queue. Sample: `20261014141000_seed_whatsapp_webhook_sample.sql` / `node scripts/seed-whatsapp-webhook.mjs`.
 22b. **Send (Cloud API).** Done for the Meta **test number** (+1 555-664-1276 / phone id `1373497502510936`). Migration `20261014150000_dental_send_whatsapp.sql`: `claim_due_notifications`, `mark_notification_failed`, extended `mark_notification_sent`. Edge Function `send-whatsapp`: approved Meta template name when set; otherwise falls back to `hello_world` (free-form text fails outside the 24h window — Meta `#131047`). UI: Process due / Send via Meta on `/whatsapp`. Secrets: `WHATSAPP_ACCESS_TOKEN`, `WHATSAPP_PHONE_NUMBER_ID` (replace with production phone id later). Optional `WHATSAPP_TEST_FALLBACK_TEMPLATE`. Test number Cloud API–registered once. Allowlist recipients until production. Sample: `20261014151000_seed_send_whatsapp_sample.sql` / `node scripts/seed-send-whatsapp.mjs`.
 
 ### Phase 4 — Promotions and loyalty (about 2 weeks)
 
-23. **Engine.** Done once migration + seed are applied. Migration `20261014170000_dental_promotions.sql`: `promotions` / `promotion_branches` / `promotion_targets` / `promotion_redemptions`; types percentage, fixed_amount, buy_x_get_y, bundle, spend_threshold; audience/scope/branches/limits; `evaluate_best_promotion` + checkout applies best single discount before VAT; owner `publish_promotion`. UI at `/promotions` (English promo record; so/ar/en WhatsApp announcement text). POS coral promo preview. Sample: buy-10-get-1 gloves, 15% hygiene services, $7 checkup (`20261014171000_seed_promotions_sample.sql` / `node scripts/seed-promotions.mjs`). Campaign broadcast enqueue stays for step 25.
+23. **Engine.** Done. Promotions UI stores English WhatsApp announcement (`whatsapp_message_en`) only.
 24. **Points.** Done once migration + seed are applied. Migration `20261014180000_dental_loyalty.sql`: `clinic_settings` (rates blank until owner), `loyalty_transactions`, `customers.loyalty_points`, checkout `p_redeem_points` + earn on paid ex-VAT, return reverse. UI: Settings/Promotions loyalty fields; POS redeem; Customers shows balance. Sample adjust 250 pts for seed patient (`20261014181000_seed_loyalty_sample.sql` / `node scripts/seed-loyalty.mjs`) — does not invent rates.
-25. **Campaigns.** Done once migration + seed are applied. Migration `20261014190000_dental_campaigns.sql`: `campaigns`, marketing templates so/ar/en, `list_promotion_audience` / `enqueue_promotion_campaign` / `cancel_campaign` / `campaign_stats`. Owner UI: Promotions Preview & enqueue; WhatsApp Campaigns tab. Opt-in + phone only; 7-day duplicate skip. Sample: `20261014191000_seed_campaigns_sample.sql` / `node scripts/seed-campaigns.mjs`.
+25. **Campaigns.** Done. Marketing templates English-only; `enqueue_promotion_campaign` always enqueues `en`.
 
 ### Phase 5 — Reports and go-live (about 1–2 weeks)
 
-26. **Reports.** Done once migration + seed are applied. Migration `20261014200000_dental_reports_dashboard.sql`: `run_report` (sales, profit, valuation, expiry, debts, VAT, promos) with period today/7d/30d/mtd/ytd; one branch or all (owner). UI at `/reports` with CSV export. Sample go-live marker only (`20261014201000_seed_reports_dashboard_sample.sql` / `node scripts/seed-reports-dashboard.mjs`) — reports reuse existing sales/stock seed data.
+26. **Reports.** Done. `run_report` covers sales, profit, valuation, expiry, debts, VAT, promos, balance_sheet, expenses, pnl. Period presets plus **custom from/to dates** (`20261017050000_dental_report_custom_range.sql`). Expenses UI at `/expenses`.
 27. **Dashboard.** Done. `dashboard_summary` RPC: today’s sales, appointments list, open AR. Dashboard page shows those KPIs plus existing stock alert counts and attention list. Branch switcher (All branches for owner).
 28. **Go-live.** Done for in-app tracking. Owner Settings → Go-live: checklist (backup, role training, templates reviewed, quality rating), config gaps (VAT/loyalty/MyCash still blank until clinic fills them), template draft/approved counts by language. Meta template approval and production WhatsApp number remain human tasks (step 6).
 
@@ -189,7 +190,7 @@ Work in order. Finish a step before starting the next one inside the same phase.
 | Loyalty | Earn rate and redeem value are Settings fields, still blank. |
 | Thermal | Both widths. Default 80 mm. |
 | WhatsApp number | New dedicated number. Keep the clinic's current chat number. |
-| Languages | Staff app is English only. WhatsApp message content is Somali and Arabic. |
+| Languages | Staff app is English only. WhatsApp message content is English only (Meta `en_US`). |
 | Promotions | Owner only. Owner picks the branches. |
 | Tenders | Cash, Zaad, eDahab, MyCash (Amal Bank, not cash). |
 | Clinic | N.I SMILE Oral care & Teeth whitening. 26 June Road 1, Hargeisa, Somaliland. Phone +252 63 4749276. Tax ID 11114. Zaad 484594. eDahab 764043. MyCash pending. |

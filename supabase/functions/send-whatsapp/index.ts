@@ -78,22 +78,14 @@ async function sendCloudMessage(input: {
       type: 'text',
       text: String(input.params[k] ?? ''),
     }))
-    // hello_world / Meta samples use en_US; approved custom templates use so, ar, or en_US.
-    const lang =
-      input.templateName === 'hello_world' || input.language === 'en'
-        ? 'en_US'
-        : input.language === 'ar'
-          ? 'ar'
-          : input.language === 'so'
-            ? 'so'
-            : String(input.language || 'en_US')
+    // Clinic WhatsApp is English-only; Meta English templates use en_US.
     payload = {
       messaging_product: 'whatsapp',
       to: input.to,
       type: 'template',
       template: {
         name: input.templateName,
-        language: { code: lang },
+        language: { code: 'en_US' },
         components:
           parameters.length > 0 && input.templateName !== 'hello_world'
             ? [{ type: 'body', parameters }]

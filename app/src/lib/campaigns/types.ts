@@ -36,7 +36,7 @@ export type AudienceMember = {
   branch_id: string
   name: string
   phone: string
-  language: 'so' | 'ar' | 'en'
+  language: 'en'
   customer_type: string
   subtype: string | null
 }

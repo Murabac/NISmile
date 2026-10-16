@@ -24,7 +24,7 @@ export type Appointment = {
   created_at: string
   customer_name: string
   customer_phone: string | null
-  customer_language: 'so' | 'ar' | 'en'
+  customer_language: 'en'
   dentist_name: string
   service_name: string | null
   service_code: string | null

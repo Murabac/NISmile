@@ -150,7 +150,7 @@ export function WhatsAppPage() {
   const templates = templatesQuery.data ?? []
   const kinds = useMemo(() => {
     const map = new Map<string, MessageTemplate[]>()
-    for (const tpl of templates) {
+    for (const tpl of templates.filter((row) => row.language === 'en')) {
       const list = map.get(tpl.kind) ?? []
       list.push(tpl)
       map.set(tpl.kind, list)
@@ -260,8 +260,8 @@ export function WhatsAppPage() {
           <p className="text-sm text-status-red">{(campaignsQuery.error as Error).message}</p>
         ) : campaigns.length === 0 ? (
           <p className="rounded-dentaflow border border-line bg-surface p-6 text-sm text-muted">
-            No campaigns yet. On Promotions, use Preview & enqueue for an opt-in WhatsApp blast
-            (so / ar / en per customer).
+            No campaigns yet. On Promotions, use Preview & enqueue for an opt-in English WhatsApp
+            blast.
           </p>
         ) : (
           <div className="space-y-3">
@@ -342,7 +342,6 @@ export function WhatsAppPage() {
               <thead className="border-b border-line bg-canvas text-[10px] tracking-wide text-muted uppercase">
                 <tr>
                   <th className="px-4 py-3 font-semibold">Kind</th>
-                  <th className="px-4 py-3 font-semibold">Languages</th>
                   <th className="px-4 py-3 font-semibold">Category</th>
                   <th className="px-4 py-3 font-semibold">Meta status</th>
                   <th className="px-4 py-3 text-end font-semibold">Preview</th>
@@ -350,68 +349,39 @@ export function WhatsAppPage() {
               </thead>
               <tbody>
                 {kinds.map(([kind, rows]) => {
-                  const so = rows.find((r) => r.language === 'so')
-                  const ar = rows.find((r) => r.language === 'ar')
-                  const en = rows.find((r) => r.language === 'en')
+                  const en =
+                    rows.find((r) => r.language === 'en') ?? rows[0] ?? null
                   return (
                     <tr key={kind} className="border-b border-line last:border-0">
                       <td className="px-4 py-3">
                         <p className="font-semibold">{KIND_LABELS[kind] ?? kind}</p>
                         <p className="font-mono text-[11px] text-muted">{kind}</p>
                       </td>
-                      <td className="px-4 py-3 text-xs">
-                        <span className="me-2 font-mono font-bold">SO</span>
-                        {so ? '✓' : '—'}
-                        <span className="mx-2 text-muted">·</span>
-                        <span className="me-2 font-mono font-bold">AR</span>
-                        {ar ? '✓' : '—'}
-                        <span className="mx-2 text-muted">·</span>
-                        <span className="me-2 font-mono font-bold">EN</span>
-                        {en ? '✓' : '—'}
-                      </td>
                       <td className="px-4 py-3 capitalize text-xs text-muted">
-                        {rows[0]?.category}
+                        {en?.category}
                       </td>
                       <td className="px-4 py-3">
                         <span
-                          className={`inline-flex rounded-full px-2 py-0.5 text-[10px] font-bold uppercase ${statusClass(rows[0]?.status ?? 'draft')}`}
+                          className={`inline-flex rounded-full px-2 py-0.5 text-[10px] font-bold uppercase ${statusClass(en?.status ?? 'draft')}`}
                         >
-                          {rows[0]?.status}
+                          {en?.status}
                         </span>
-                        {!rows[0]?.whatsapp_template_id ? (
+                        {!en?.whatsapp_template_id ? (
                           <p className="mt-1 text-[10px] text-muted">No Meta template id yet</p>
                         ) : null}
                       </td>
                       <td className="px-4 py-3 text-end">
-                        <div className="inline-flex gap-1">
-                          {so ? (
-                            <button
-                              type="button"
-                              onClick={() => setPreview(so)}
-                              className="rounded-md border border-line px-2 py-1 text-[10px] font-bold"
-                            >
-                              SO
-                            </button>
-                          ) : null}
-                          {ar ? (
-                            <button
-                              type="button"
-                              onClick={() => setPreview(ar)}
-                              className="rounded-md border border-line px-2 py-1 text-[10px] font-bold"
-                            >
-                              AR
-                            </button>
-                          ) : null}
-                          {en ? (
-                            <button
-                              type="button"
-                              onClick={() => setPreview(en)}
-                              className="rounded-md border border-line px-2 py-1 text-[10px] font-bold"
-                            >
-                              EN
-                            </button>
-                          ) : null}
-                        </div>
+                        {en ? (
+                          <button
+                            type="button"
+                            onClick={() => setPreview(en)}
+                            className="rounded-md border border-line px-2 py-1 text-[10px] font-bold"
+                          >
+                            Preview
+                          </button>
+                        ) : (
+                          <span className="text-xs text-muted">—</span>
+                        )}
                       </td>
                     </tr>
                   )
@@ -437,7 +407,6 @@ export function WhatsAppPage() {
                   <th className="px-4 py-3 font-semibold">Scheduled</th>
                   <th className="px-4 py-3 font-semibold">Recipient</th>
                   <th className="px-4 py-3 font-semibold">Kind</th>
-                  <th className="px-4 py-3 font-semibold">Lang</th>
                   <th className="px-4 py-3 font-semibold">Status</th>
                   <th className="px-4 py-3 text-end font-semibold">Actions</th>
                 </tr>
@@ -455,7 +424,6 @@ export function WhatsAppPage() {
                     <td className="px-4 py-3 text-xs">
                       {KIND_LABELS[item.kind] ?? item.kind}
                     </td>
-                    <td className="px-4 py-3 font-mono text-xs uppercase">{item.language}</td>
                     <td className="px-4 py-3">
                       <span
                         className={`inline-flex rounded-full px-2 py-0.5 text-[10px] font-bold uppercase ${statusClass(item.status)}`}
@@ -602,7 +570,7 @@ export function WhatsAppPage() {
                   {preview.name}
                 </p>
                 <p className="text-[11px] text-muted">
-                  {preview.language.toUpperCase()} · draft body (Meta id not set)
+                  English · draft body (Meta id not set)
                 </p>
               </div>
               <button

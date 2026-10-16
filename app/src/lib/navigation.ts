@@ -14,6 +14,7 @@ import {
   Sparkles,
   Truck,
   Users,
+  Wallet,
 } from 'lucide-react'
 import type { StaffRole } from './database.types.ts'
 
@@ -80,6 +81,13 @@ export const screens: Screen[] = [
     path: '/purchases',
     icon: Truck,
     roles: ['owner', 'branch_manager', 'storekeeper'],
+  },
+  {
+    id: 'expenses',
+    label: 'Expenses',
+    path: '/expenses',
+    icon: Wallet,
+    roles: ['owner', 'branch_manager', 'receptionist'],
   },
   {
     id: 'services',

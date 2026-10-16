@@ -41,7 +41,7 @@ export function SaleDocumentsModal({
     onSuccess: (id) => {
       setNotice(
         id
-          ? 'WhatsApp notice queued (Somali/Arabic). PDF stays English when attached later.'
+          ? 'WhatsApp notice queued (English). PDF stays English when attached later.'
           : 'No notice queued — customer may be walk-in, opted out, or already notified.',
       )
     },

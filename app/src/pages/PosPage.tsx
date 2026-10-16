@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import {
   CheckCircle2,
@@ -12,9 +12,11 @@ import {
   Trash2,
   User,
 } from 'lucide-react'
+import { useNavigate, useSearchParams } from 'react-router-dom'
 import { ReturnDrawer } from '../components/ReturnDrawer.tsx'
 import { SaleDocumentsModal } from '../components/SaleDocumentsModal.tsx'
 import { useAuth } from '../lib/auth.tsx'
+import { linkAppointmentSale } from '../lib/appointments/api.ts'
 import { fetchItems, fetchServices, basePrice } from '../lib/catalog/api.ts'
 import type { CatalogItem, CatalogService } from '../lib/catalog/types.ts'
 import { formatMoney } from '../lib/money.ts'
@@ -59,6 +61,8 @@ const emptyTenders = (): TenderDraft => ({
 export function PosPage() {
   const { branchId } = useAuth()
   const queryClient = useQueryClient()
+  const navigate = useNavigate()
+  const [searchParams] = useSearchParams()
 
   const [tab, setTab] = useState<'items' | 'services'>('items')
   const [search, setSearch] = useState('')
@@ -75,6 +79,8 @@ export function PosPage() {
   const [docsMode, setDocsMode] = useState<'receipt' | 'invoice'>('receipt')
   const [returnOpen, setReturnOpen] = useState(false)
   const [redeemLoyalty, setRedeemLoyalty] = useState(false)
+  const [appointmentId, setAppointmentId] = useState<string | null>(null)
+  const prefillsApplied = useRef<string | null>(null)
 
   function setCustomerId(id: string) {
     setCustomerIdState(id)
@@ -117,6 +123,66 @@ export function PosPage() {
     for (const row of stockQuery.data ?? []) map.set(row.item_id, row.qty_on_hand)
     return map
   }, [stockQuery.data])
+
+  useEffect(() => {
+    if (!branchReady) return
+    if (customersQuery.isLoading || servicesQuery.isLoading) return
+
+    const apt = searchParams.get('appointment')
+    const customer = searchParams.get('customer')
+    const service = searchParams.get('service')
+    if (!apt || !customer) {
+      setAppointmentId(null)
+      return
+    }
+
+    const applyKey = `${apt}:${customer}:${service ?? ''}`
+    if (prefillsApplied.current === applyKey) return
+    prefillsApplied.current = applyKey
+
+    setAppointmentId(apt)
+    setCustomerId(customer)
+
+    if (service) {
+      const catalogService = services.find((row) => row.id === service)
+      if (catalogService) {
+        const taxRate =
+          catalogService.tax_rates && Number(catalogService.tax_rates.rate) >= 0
+            ? Number(catalogService.tax_rates.rate)
+            : 0
+        const unit =
+          resolveDisplayPrice(catalogService.service_prices ?? [], 'retail', 1, {
+            retailOnly: true,
+          }) ??
+          basePrice(catalogService.service_prices ?? [], 'retail') ??
+          0
+        setTab('services')
+        setCart((current) => {
+          if (current.some((line) => line.service_id === catalogService.id)) return current
+          return [
+            ...current,
+            {
+              key: `service-${catalogService.id}`,
+              line_type: 'service',
+              item_id: null,
+              service_id: catalogService.id,
+              sku_or_code: catalogService.code,
+              name: catalogService.name,
+              qty: 1,
+              unit_price: unit,
+              tax_rate: taxRate,
+            },
+          ]
+        })
+      }
+    }
+  }, [
+    branchReady,
+    customersQuery.isLoading,
+    servicesQuery.isLoading,
+    searchParams,
+    services,
+  ])
 
   const selectedCustomer = customers.find((c) => c.id === customerId) ?? null
   const isWholesale = selectedCustomer?.customer_type === 'wholesale'
@@ -314,6 +380,10 @@ export function PosPage() {
         throw new Error('Enter at least one payment amount.')
       }
 
+      if (appointmentId && (customerId === 'walk-in' || !customerId)) {
+        throw new Error('Select the appointment patient before checkout.')
+      }
+
       const saleId = await checkoutSale({
         branchId,
         customerId: customerId === 'walk-in' ? null : customerId,
@@ -327,6 +397,11 @@ export function PosPage() {
         dueDate: isWholesale && unpaid > 0.009 && chargeToAccount ? dueDate : null,
         redeemPoints: redeemLoyalty ? loyaltyPointsUsed : 0,
       })
+
+      if (appointmentId) {
+        await linkAppointmentSale(appointmentId, saleId)
+      }
+
       return fetchSale(saleId)
     },
     onSuccess: async (sale) => {
@@ -344,6 +419,12 @@ export function PosPage() {
       )
       setDocsMode(isWholesale ? 'invoice' : 'receipt')
       setDocsOpen(true)
+      if (appointmentId) {
+        setAppointmentId(null)
+        prefillsApplied.current = null
+        navigate('/pos', { replace: true })
+        await queryClient.invalidateQueries({ queryKey: ['appointments'] })
+      }
       await queryClient.invalidateQueries({ queryKey: ['stock_summaries'] })
       await queryClient.invalidateQueries({ queryKey: ['sales'] })
       await queryClient.invalidateQueries({ queryKey: ['pos_customers'] })
@@ -495,6 +576,13 @@ export function PosPage() {
           payment allowed.
         </p>
       </div>
+
+      {appointmentId ? (
+        <div className="rounded-dentaflow border border-flow-teal/40 bg-flow-teal/10 px-4 py-3 text-sm text-main">
+          Checking out appointment · add products then pay. Completing checkout marks the visit
+          completed and links this sale.
+        </div>
+      ) : null}
 
       {lastSale ? (
         <div className="flex flex-wrap items-center justify-between gap-3 rounded-dentaflow border border-status-green/40 bg-surface px-4 py-3">

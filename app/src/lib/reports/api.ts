@@ -11,11 +11,16 @@ export async function runReport(input: {
   type: ReportType
   branchId: string | 'all'
   period: ReportPeriod
+  fromDate?: string | null
+  toDate?: string | null
 }): Promise<ReportResult> {
+  const custom = input.period === 'custom'
   const { data, error } = await supabase.rpc('run_report', {
     p_report_type: input.type,
     p_branch_id: input.branchId === 'all' ? null : input.branchId,
     p_period: input.period,
+    p_from_date: custom ? input.fromDate ?? null : null,
+    p_to_date: custom ? input.toDate ?? null : null,
   })
   if (error) throw error
   return data as ReportResult

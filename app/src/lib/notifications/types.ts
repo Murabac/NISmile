@@ -3,7 +3,7 @@ export type TemplateApprovalStatus = 'draft' | 'pending' | 'approved' | 'rejecte
 export type QueueStatus = 'pending' | 'processing' | 'sent' | 'failed' | 'cancelled'
 export type LogDirection = 'outbound' | 'inbound'
 export type LogStatus = 'queued' | 'sent' | 'delivered' | 'read' | 'failed' | 'replied'
-export type WhatsAppLanguage = 'so' | 'ar' | 'en'
+export type WhatsAppLanguage = 'en'
 
 export type MessageTemplate = {
   id: string

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, type FormEvent } from 'react'
+import { useEffect, useState, type FormEvent } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Plus, Share2, Users } from 'lucide-react'
 import { Modal } from '../components/Modal.tsx'
@@ -26,13 +26,9 @@ import {
 import { formatMoney } from '../lib/money.ts'
 
 type Tab = 'promos' | 'loyalty'
-type PreviewLang = 'so' | 'ar' | 'en'
 
-const defaultMsgs = {
-  en: 'Exclusive offer from N.I SMILE Oral care & Teeth whitening. Ask staff for details.',
-  so: 'Dalab Gaar Ah N.I SMILE Oral care & Teeth whitening. Weydii shaqaalaha faahfaahin.',
-  ar: 'عرض حصري من N.I SMILE Oral care & Teeth whitening. اسأل الموظفين للتفاصيل.',
-}
+const defaultMsgEn =
+  'Exclusive offer from N.I SMILE Oral care & Teeth whitening. Ask staff for details.'
 
 function statusClass(status: string) {
   if (status === 'active') return 'bg-status-green/15 text-status-green'
@@ -81,10 +77,7 @@ export function PromotionsPage() {
   const [itemId, setItemId] = useState('')
   const [serviceIds, setServiceIds] = useState<string[]>([])
   const [notifyWhatsApp, setNotifyWhatsApp] = useState(true)
-  const [msgEn, setMsgEn] = useState(defaultMsgs.en)
-  const [msgSo, setMsgSo] = useState(defaultMsgs.so)
-  const [msgAr, setMsgAr] = useState(defaultMsgs.ar)
-  const [previewLang, setPreviewLang] = useState<PreviewLang>('so')
+  const [msgEn, setMsgEn] = useState(defaultMsgEn)
   const [publishOnCreate, setPublishOnCreate] = useState(true)
 
   const isOwner = profile?.role === 'owner'
@@ -163,12 +156,6 @@ export function PromotionsPage() {
     }
   }
 
-  const previewMsg = useMemo(() => {
-    if (previewLang === 'so') return msgSo
-    if (previewLang === 'ar') return msgAr
-    return msgEn
-  }, [previewLang, msgSo, msgAr, msgEn])
-
   if (!isOwner) {
     return (
       <section className="rounded-dentaflow border border-line bg-surface p-6">
@@ -213,8 +200,8 @@ export function PromotionsPage() {
       ends_at: endIso,
       notify_whatsapp: notifyWhatsApp,
       whatsapp_message_en: notifyWhatsApp ? msgEn : null,
-      whatsapp_message_so: notifyWhatsApp ? msgSo : null,
-      whatsapp_message_ar: notifyWhatsApp ? msgAr : null,
+      whatsapp_message_so: null,
+      whatsapp_message_ar: null,
       branch_ids: allBranches ? [] : branchIds,
       item_ids: scope === 'items' && itemId ? [itemId] : [],
       service_ids: scope === 'services' ? serviceIds : [],
@@ -401,7 +388,7 @@ export function PromotionsPage() {
         open={audiencePromoId != null}
         onClose={() => setAudiencePromoId(null)}
         title="Campaign audience preview"
-        subtitle="Opt-in customers with a phone, in their WhatsApp language (so / ar / en)"
+        subtitle="Opt-in customers with a phone · English WhatsApp templates"
         maxWidth="lg"
         footer={
           <div className="flex w-full flex-wrap items-center justify-between gap-3">
@@ -796,7 +783,7 @@ export function PromotionsPage() {
               <div>
                 <span className="font-bold">Notify eligible customers on WhatsApp</span>
                 <p className="text-[11px] text-muted">
-                  Stores so / ar / en announcement text. Campaign enqueue is the next step after points.
+                  English announcement text only. Campaign enqueue uses Meta English templates.
                 </p>
               </div>
               <input
@@ -808,34 +795,13 @@ export function PromotionsPage() {
             </div>
             {notifyWhatsApp ? (
               <div className="space-y-2 border-t border-line pt-2">
-                <div className="flex items-center justify-between">
-                  <span className="text-[10px] font-bold uppercase text-muted">Message preview</span>
-                  <div className="flex gap-1">
-                    {(['so', 'ar', 'en'] as PreviewLang[]).map((lang) => (
-                      <button
-                        key={lang}
-                        type="button"
-                        onClick={() => setPreviewLang(lang)}
-                        className={`rounded px-2 py-0.5 text-[10px] font-bold uppercase ${
-                          previewLang === lang
-                            ? 'bg-flow-teal text-white'
-                            : 'bg-surface text-muted'
-                        }`}
-                      >
-                        {lang}
-                      </button>
-                    ))}
-                  </div>
-                </div>
+                <span className="text-[10px] font-bold uppercase text-muted">
+                  English message
+                </span>
                 <textarea
-                  value={previewMsg}
-                  onChange={(e) => {
-                    if (previewLang === 'so') setMsgSo(e.target.value)
-                    else if (previewLang === 'ar') setMsgAr(e.target.value)
-                    else setMsgEn(e.target.value)
-                  }}
+                  value={msgEn}
+                  onChange={(e) => setMsgEn(e.target.value)}
                   rows={4}
-                  dir={previewLang === 'ar' ? 'rtl' : 'ltr'}
                   className="w-full rounded-[8px] border border-line bg-surface p-3 font-mono text-[11px] leading-relaxed"
                 />
               </div>

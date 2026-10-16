@@ -9,11 +9,11 @@ import {
   User,
   X,
 } from 'lucide-react'
+import { useNavigate } from 'react-router-dom'
 import { Drawer } from '../components/Drawer.tsx'
 import { useAuth } from '../lib/auth.tsx'
 import {
   addDays,
-  completeAppointment,
   createAppointment,
   createBranchDentist,
   fetchAppointments,
@@ -46,6 +46,7 @@ function formatTime(iso: string) {
 
 export function AppointmentsPage() {
   const { branchId } = useAuth()
+  const navigate = useNavigate()
   const queryClient = useQueryClient()
   const [weekAnchor, setWeekAnchor] = useState(() => startOfWeek(new Date()))
   const [dentistFilter, setDentistFilter] = useState('all')
@@ -64,8 +65,6 @@ export function AppointmentsPage() {
   const [addingPatient, setAddingPatient] = useState(false)
   const [newPatientName, setNewPatientName] = useState('')
   const [newPatientPhone, setNewPatientPhone] = useState('')
-  const [newPatientLang, setNewPatientLang] = useState<'so' | 'ar' | 'en'>('so')
-
   const [addingDentist, setAddingDentist] = useState(false)
   const [newDentistName, setNewDentistName] = useState('')
   const [newDentistEmail, setNewDentistEmail] = useState('')
@@ -184,22 +183,15 @@ export function AppointmentsPage() {
     onError: (err: Error) => setError(err.message),
   })
 
-  const completeMutation = useMutation({
-    mutationFn: async (apt: Appointment) =>
-      completeAppointment(apt.id, {
-        serviceId: apt.service_id,
-        notes: 'Completed from calendar',
-      }),
-    onSuccess: async () => {
-      await queryClient.invalidateQueries({ queryKey: ['appointments'] })
-      await queryClient.invalidateQueries({ queryKey: ['branch_sales'] })
-      await queryClient.invalidateQueries({ queryKey: ['notification_queue'] })
-      setSelected(null)
-      setError(null)
-      setInfo('Visit completed. Receipt notice queued when the patient is opted in.')
-    },
-    onError: (err: Error) => setError(err.message),
-  })
+  function checkoutInPos(apt: Appointment) {
+    const params = new URLSearchParams({
+      appointment: apt.id,
+      customer: apt.customer_id,
+    })
+    if (apt.service_id) params.set('service', apt.service_id)
+    setSelected(null)
+    navigate(`/pos?${params.toString()}`)
+  }
 
   const addPatientMutation = useMutation({
     mutationFn: async () => {
@@ -210,7 +202,7 @@ export function AppointmentsPage() {
         phone: newPatientPhone.trim() || null,
         customer_type: 'retail',
         subtype: null,
-        language: newPatientLang,
+        language: 'en',
         whatsapp_opt_in: Boolean(newPatientPhone.trim()),
         credit_limit: null,
         notes: null,
@@ -222,7 +214,6 @@ export function AppointmentsPage() {
       setAddingPatient(false)
       setNewPatientName('')
       setNewPatientPhone('')
-      setNewPatientLang('so')
       setError(null)
     },
     onError: (err: Error) => setError(err.message),
@@ -264,7 +255,6 @@ export function AppointmentsPage() {
     setAddingDentist(false)
     setNewPatientName('')
     setNewPatientPhone('')
-    setNewPatientLang('so')
     setNewDentistName('')
     setNewDentistEmail('')
     setNewDentistPassword('')
@@ -439,7 +429,7 @@ export function AppointmentsPage() {
                         </p>
                         <p className="text-[10px] text-muted">{apt.dentist_name}</p>
                         <p className="border-t border-line pt-1.5 text-[10px] text-muted">
-                          WhatsApp: {apt.customer_language.toUpperCase()} · later
+                          Checkout in POS when the visit ends
                         </p>
                       </button>
                     ))
@@ -458,14 +448,13 @@ export function AppointmentsPage() {
                 <th className="px-4 py-3 font-semibold">Patient</th>
                 <th className="px-4 py-3 font-semibold">Dentist</th>
                 <th className="px-4 py-3 font-semibold">Service</th>
-                <th className="px-4 py-3 font-semibold">Lang</th>
                 <th className="px-4 py-3 font-semibold">Status</th>
               </tr>
             </thead>
             <tbody>
               {appointments.length === 0 ? (
                 <tr>
-                  <td colSpan={6} className="px-4 py-8 text-center text-sm text-muted">
+                  <td colSpan={5} className="px-4 py-8 text-center text-sm text-muted">
                     No appointments this week.
                   </td>
                 </tr>
@@ -497,9 +486,6 @@ export function AppointmentsPage() {
                     </td>
                     <td className="px-4 py-3 text-sm">{apt.dentist_name}</td>
                     <td className="px-4 py-3 text-sm text-muted">{apt.service_name ?? '—'}</td>
-                    <td className="px-4 py-3 font-mono text-xs uppercase">
-                      {apt.customer_language}
-                    </td>
                     <td className="px-4 py-3">
                       <span
                         className={`inline-flex rounded-full px-2 py-0.5 text-[10px] font-bold uppercase ${statusClass(apt.status)}`}
@@ -519,7 +505,7 @@ export function AppointmentsPage() {
         open={bookingOpen}
         onClose={() => setBookingOpen(false)}
         title="Book appointment"
-        subtitle="Retail patient · preferred WhatsApp language is on the customer record (so/ar/en)."
+        subtitle="Retail patient · WhatsApp notices use English Meta templates."
         footer={
           <div className="flex justify-end gap-2">
             <button
@@ -579,20 +565,6 @@ export function AppointmentsPage() {
                     placeholder="+25263…"
                   />
                 </label>
-                <label className="block text-xs font-semibold">
-                  Message language
-                  <select
-                    value={newPatientLang}
-                    onChange={(event) =>
-                      setNewPatientLang(event.target.value as 'so' | 'ar' | 'en')
-                    }
-                    className="mt-1 h-9 w-full rounded-md border border-line bg-surface px-2 font-normal"
-                  >
-                    <option value="so">Somali</option>
-                    <option value="ar">Arabic</option>
-                    <option value="en">English</option>
-                  </select>
-                </label>
                 <button
                   type="button"
                   disabled={addPatientMutation.isPending}
@@ -614,7 +586,7 @@ export function AppointmentsPage() {
                 <option value="">Select patient…</option>
                 {patients.map((p) => (
                   <option key={p.id} value={p.id}>
-                    {p.name} · {p.language.toUpperCase()}
+                    {p.name}
                     {p.phone ? ` · ${p.phone}` : ''}
                   </option>
                 ))}
@@ -799,11 +771,10 @@ export function AppointmentsPage() {
                   </button>
                   <button
                     type="button"
-                    disabled={completeMutation.isPending || !selected.service_id}
-                    onClick={() => completeMutation.mutate(selected)}
-                    className="h-10 rounded-dentaflow bg-marine px-4 text-sm font-bold text-white disabled:opacity-60"
+                    onClick={() => checkoutInPos(selected)}
+                    className="h-10 rounded-dentaflow bg-marine px-4 text-sm font-bold text-white"
                   >
-                    {completeMutation.isPending ? 'Completing…' : 'Complete + sale'}
+                    Checkout in POS
                   </button>
                 </>
               ) : (
@@ -826,8 +797,7 @@ export function AppointmentsPage() {
           <div className="space-y-3 text-sm">
             <div className="flex items-center gap-2 text-muted">
               <User className="h-4 w-4" />
-              {selected.customer_phone ?? 'No phone'} · WhatsApp{' '}
-              {selected.customer_language.toUpperCase()}
+              {selected.customer_phone ?? 'No phone'}
             </div>
             <div className="flex items-center gap-2 text-muted">
               <CalendarDays className="h-4 w-4" />
@@ -848,9 +818,11 @@ export function AppointmentsPage() {
             {selected.sale_id ? (
               <p className="text-xs text-status-green">Sale linked · {selected.sale_id.slice(0, 8)}…</p>
             ) : null}
-            {!selected.service_id && selected.status !== 'completed' ? (
+            {!selected.service_id &&
+            (selected.status === 'scheduled' || selected.status === 'confirmed') ? (
               <p className="text-xs text-status-amber">
-                Link a service at booking to enable Complete + sale.
+                No service linked at booking. POS will open with the patient; add services
+                there.
               </p>
             ) : null}
 
@@ -892,8 +864,8 @@ export function AppointmentsPage() {
             ) : null}
 
             <p className="text-[11px] text-muted">
-              Opted-in patients get Somali/Arabic confirmation, 24h/2h reminders, and
-              cancel/reschedule notices in the WhatsApp queue (Meta send later).
+              Opted-in patients get English confirmation, 24h/2h reminders, and
+              cancel/reschedule notices in the WhatsApp queue.
             </p>
           </div>
         ) : null}

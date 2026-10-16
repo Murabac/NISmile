@@ -11,6 +11,7 @@ import { AppointmentsPage } from './pages/AppointmentsPage.tsx'
 import { PosPage } from './pages/PosPage.tsx'
 import { SalesPage } from './pages/SalesPage.tsx'
 import { ScreenPage } from './pages/ScreenPage.tsx'
+import { ExpensesPage } from './pages/ExpensesPage.tsx'
 import { PurchasesPage } from './pages/PurchasesPage.tsx'
 import { ServicesPage } from './pages/ServicesPage.tsx'
 import { SettingsPage } from './pages/SettingsPage.tsx'
@@ -37,6 +38,7 @@ function screenElement(path: string) {
   if (path === '/transfers') return <TransfersPage />
   if (path === '/services') return <ServicesPage />
   if (path === '/purchases') return <PurchasesPage />
+  if (path === '/expenses') return <ExpensesPage />
   if (path === '/customers') return <CustomersPage />
   if (path === '/appointments') return <AppointmentsPage />
   if (path === '/promotions') return <PromotionsPage />

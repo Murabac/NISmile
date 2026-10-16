@@ -16,7 +16,7 @@ const appointmentSelect = `
 
 function normalizeAppointment(row: Record<string, unknown>): Appointment {
   const customer = row.customers as
-    | { name: string; phone: string | null; language: 'so' | 'ar' | 'en' }
+    | { name: string; phone: string | null; language: 'en' }
     | null
   const dentist = row.profiles as { name: string } | null
   const service = row.services as
@@ -43,7 +43,7 @@ function normalizeAppointment(row: Record<string, unknown>): Appointment {
     created_at: row.created_at as string,
     customer_name: customer?.name ?? 'Patient',
     customer_phone: customer?.phone ?? null,
-    customer_language: customer?.language ?? 'so',
+    customer_language: 'en',
     dentist_name: dentist?.name ?? 'Dentist',
     service_name: service?.name ?? null,
     service_code: service?.code ?? null,
@@ -176,6 +176,18 @@ export async function completeAppointment(
   })
   if (error) throw error
   return data as string
+}
+
+/** After POS checkout: mark visit completed and attach the sale. */
+export async function linkAppointmentSale(
+  appointmentId: string,
+  saleId: string,
+): Promise<void> {
+  const { error } = await supabase.rpc('link_appointment_sale', {
+    p_appointment_id: appointmentId,
+    p_sale_id: saleId,
+  })
+  if (error) throw error
 }
 
 export function startOfWeek(date: Date): Date {
