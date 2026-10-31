@@ -1,0 +1,11 @@
+node_modules
+dist
+dist-ssr
+*.local
+.env
+.env.*
+.git
+.DS_Store
+scripts
+*.log
+.oxlintrc.json

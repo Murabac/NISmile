@@ -2,7 +2,7 @@
 
 This file is the map for building DentaFlow. The product spec is `DentaFlow-Project-Plan-v2.md`. The look and screen behavior come from `Design Ref/`. Logos live in `Brand/`.
 
-**Current step:** Expenses + P&L reports added. Apply `20261017040000_dental_expenses.sql` (and prior pending migrations: appointment POS, WhatsApp English-only, balance sheet). Step 6: submit **English** Meta templates (`en_US`). Credentials stay in Edge secrets / `app/.env.local`. Do not invent the VAT percentage, loyalty rates, a MyCash account number, or WhatsApp credentials.
+**Current step:** Deploy staff UI to Coolify (`app/Dockerfile` + nginx SPA). Set Coolify build-args `VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY` (same values as `app/.env.local`). Base directory / Dockerfile context: `app`. Add the Coolify domain to Supabase Auth → URL configuration. WhatsApp/Twilio and clinic Settings gaps (VAT, loyalty, MyCash) continue later. Do not invent credentials.
 
 ## What this repo is
 
