@@ -2,7 +2,7 @@
 
 This file is the map for building DentaFlow. The product spec is `DentaFlow-Project-Plan-v2.md`. The look and screen behavior come from `Design Ref/`. Logos live in `Brand/`.
 
-**Current step:** Deploy staff UI to Coolify (`app/Dockerfile` + nginx SPA). Set Coolify build-args `VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY` (same values as `app/.env.local`). Base directory / Dockerfile context: `app`. Add the Coolify domain to Supabase Auth → URL configuration. WhatsApp/Twilio and clinic Settings gaps (VAT, loyalty, MyCash) continue later. Do not invent credentials.
+**Current step:** Deploy staff UI to Coolify (repo-root `Dockerfile` + `app/nginx.conf`). Coolify: Base Directory empty / `.`, Dockerfile `Dockerfile`, port 80. Build-args `VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY`. Add the Coolify domain to Supabase Auth → URL configuration. WhatsApp/Twilio and clinic Settings gaps continue later. Do not invent credentials.
 
 ## What this repo is
 

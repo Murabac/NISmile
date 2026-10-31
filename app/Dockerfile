@@ -1,5 +1,6 @@
-# DentaFlow staff UI — static Vite build served by nginx (Coolify / any Docker host).
-# Backend stays on Supabase. Pass VITE_* as build-args (baked into the JS bundle).
+# Prefer the repo-root Dockerfile for Coolify (build context = repository root).
+# Kept so a Base Directory of `app` still works if you set that explicitly.
+# DentaFlow staff UI — static Vite build served by nginx.
 
 FROM node:22-alpine AS build
 WORKDIR /app

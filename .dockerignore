@@ -1,0 +1,15 @@
+**/node_modules
+**/dist
+**/dist-ssr
+**/*.local
+**/.env
+**/.env.*
+.git
+.cursor
+Design Ref
+Brand
+supabase
+docs
+*.md
+**/*.log
+app/scripts
