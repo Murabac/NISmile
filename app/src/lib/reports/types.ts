@@ -41,6 +41,8 @@ export type DashboardSummary = {
   }>
   debts: { open_invoices: number; ar_balance: number; overdue: number }
   debt_rows: Array<{
+    sale_id: string
+    customer_id: string | null
     receipt_number: string
     customer_name: string | null
     balance: number

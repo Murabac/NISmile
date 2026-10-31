@@ -2,7 +2,7 @@
 
 This file is the map for building DentaFlow. The product spec is `DentaFlow-Project-Plan-v2.md`. The look and screen behavior come from `Design Ref/`. Logos live in `Brand/`.
 
-**Current step:** Deploy staff UI to Coolify (repo-root `Dockerfile` + `app/nginx.conf`). Coolify: Base Directory empty / `.`, Dockerfile `Dockerfile`, port 80. Build-args `VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY`. Add the Coolify domain to Supabase Auth → URL configuration. WhatsApp/Twilio and clinic Settings gaps continue later. Do not invent credentials.
+**Current step:** **35 — Promotions Send WhatsApp.** Step 34 appointment one-click WhatsApp done. Meta test-number send works; production API number still human (step 37). Coolify Docker for the staff UI is in-repo (`Dockerfile`, `app/nginx.conf`): Base Directory empty / `.`, port 80, build-args `VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY`; add the Coolify domain to Supabase Auth → URL configuration if not done. Do not invent the VAT percentage, loyalty rates, a MyCash account number, or WhatsApp tokens.
 
 ## What this repo is
 
@@ -23,7 +23,7 @@ DentaFlow is a multi-branch dental clinic system: inventory, retail and wholesal
 - **Name:** DentaFlow is the staff app. The clinic is N.I SMILE. GitHub remote: https://github.com/Murabac/NISmile.git on `main`. Do not commit `app/.env.local`.
 - **Currency:** USD only. Store money as `numeric(12,2)`. No exchange rates.
 - **Staff app language:** English only. No language switcher, no translated screens, no RTL layout. Section 3.8 of the plan and the prototype's language switcher are superseded.
-- **WhatsApp languages:** message content is **English only**. Meta Cloud API template language is always **`en_US`**. `customers.language` is forced to `en` (so/ar enum values unused). No customer language picker. Staff UI stays English-only (no screen translation / no RTL switcher).
+- **WhatsApp languages:** message content is **English only**. Meta Cloud API templates use **`en_US`**. `customers.language` is forced to `en` (so/ar enum values unused). No customer language picker. Staff UI stays English-only (no screen translation / no RTL switcher).
 - **Branches:** Schema supports many branches. Owner manages them in **Settings → Branches** (create, edit, deactivate, delete). **Seed one branch** for go-live. Owners can view all branches once more exist. Everyone else is limited to their branches.
 - **Shared across branches:** items, services, price lists, tax rates.
 - **Per branch:** customers (patients and wholesale), stock, sales, appointments, purchases, expenses, cash. A customer record belongs to one branch.
@@ -37,7 +37,7 @@ DentaFlow is a multi-branch dental clinic system: inventory, retail and wholesal
 - **VAT:** shelf prices **exclude** tax. VAT is added at checkout. The percentage is a Settings value and stays empty until the clinic confirms it.
 - **Receipts:** thermal print at **80 mm by default, with 58 mm available**, A4 PDF invoice, and WhatsApp PDF, all from the same sale.
 - **Checkout tenders:** Cash, Zaad, eDahab, and MyCash. MyCash is an Amal Bank service, not physical cash. Wholesale on-account balance (credit limit, due date, statement) stays in the product; it is not a fifth tender named cash.
-- **WhatsApp:** a **new dedicated number** for the Cloud API. The clinic keeps its current WhatsApp for normal chat.
+- **WhatsApp provider:** **Meta WhatsApp Cloud API** (direct Graph API via Edge Functions). Left Twilio (compliance delays). **Two numbers (locked):** (1) clinic’s **existing** WhatsApp = human chat on the phone app; (2) a **second** number = Cloud API only (must not be on WhatsApp app). Use a healthy WABA under verified **M2B TECHNOLOGY (IT SOLUTIONS)** — do not reuse a Meta-disabled WABA. Tokens: `WHATSAPP_ACCESS_TOKEN`, `WHATSAPP_PHONE_NUMBER_ID`, `WHATSAPP_VERIFY_TOKEN` in Edge secrets only.
 - **Clinic on customer-facing output:** legal name **N.I SMILE Oral care & Teeth whitening**. Logo file `Brand/nismile-logo.jpg` (green tooth, wordmark N.ISMILE). Address **26 June Road 1, Hargeisa, Somaliland**. Phone **+252 63 4749276**. Tax ID **11114**. Zaad **484594**. eDahab **764043**. MyCash (Amal Bank) prints as **Pending** until the clinic has an account number. These appear on receipts, invoices, and account statements. The staff app is still called DentaFlow.
 - **Clinical chart:** out of v1. Visit notes only.
 - **Offline POS:** out of v1.
@@ -123,10 +123,10 @@ Edge Functions
   campaign-builder  resolve audience, enqueue
   import-processor  validate and load Excel
         │
-WhatsApp Cloud API
+Meta Cloud API (second API number) + clinic chat WhatsApp (existing)
 ```
 
-A Cloud API number cannot stay logged into the normal WhatsApp app. Preferred path: a new dedicated number, and the clinic keeps its current chat number.
+**Two-number policy (locked):** keep the familiar number for human chat. Register a second number on Meta Cloud API (not on the WhatsApp app).
 
 ## Build steps
 
@@ -139,7 +139,7 @@ Work in order. Finish a step before starting the next one inside the same phase.
 3. **Theme.** Done. Tokens, fonts, dark mode, logo, 10px radius, and print hooks are in `app/`. Left-to-right layout. No language switcher.
 4. **Database.** Done. `dental` is exposed on project `iwnswhnoxbvgyqljfvel`. One branch is seeded. `profiles`, `user_branches`, and `customers` exist, with row-level security. The client is `app/src/lib/supabase.ts` and uses only the anon key. The first email signup becomes the owner.
 5. **Shell.** Done. Email sign-in and account creation, marine sidebar, header, branch switcher, and role-gated routes for the 13 screens. Owners can use All branches on Dashboard and Reports. Login has quick buttons for the five demo roles (`owner@nismile.local` through `storekeeper@nismile.local`, password `dentaflow-demo`). Re-seed with `node scripts/seed-demo-users.mjs` from `app/`. No in-app role switcher and no language switcher.
-6. **WhatsApp prep (human, in parallel).** Meta Business account, business verification, dedicated number. Submit **English** templates (`en_US`). Not blocking UI work.
+6. **WhatsApp prep (human, in parallel).** Meta Business verification for M2B + dedicated API number. Phase 6 returned to Meta Cloud API after leaving Twilio.
 
 ### Phase 1 — Inventory and import (about 2–3 weeks)
 
@@ -156,16 +156,16 @@ Work in order. Finish a step before starting the next one inside the same phase.
 14. **Services.** Done once migration + seed are applied. Migration `20261014070000_dental_service_recipes.sql`: `service_recipes` + `apply_service_recipe` (FEFO `service_usage`). Services UI: list + recipe panel, edit drawer with materials, **Record usage** when a branch is selected. Sample recipes on SRV-001/002/003 + one SRV-002 usage movement (`20261014071000_seed_service_recipes_sample.sql`).
 15. **POS.** Done once migration + seed are applied. Migration `20261014080000_dental_sales.sql`: `sales`, `sale_lines`, `payments`, `checkout_sale`. UI at `/pos` (branch required): catalog, walk-in/customer, cart, tenders, partial OK. Promotions/points/receipts deferred. Sample walk-in sale (`20261014081000_seed_sales_sample.sql`).
 16. **Wholesale.** Done once migration + seed are applied. Migration `20261014090000_dental_wholesale.sql`: `sales.due_date`, extended `checkout_sale`, `customer_ar_balance`, `apply_customer_payment`. POS charge-to-account for wholesale. Customers page at `/customers` with AR, statement (browser print), record payment. Sample wholesale customer + on-account + Zaad settlement (`20261014091000_seed_wholesale_sample.sql`).
-17. **Documents.** Done. English thermal receipt (80 mm default, 58 mm option) and A4 tax invoice from the same sale via `SaleDocumentsModal` + browser print / Save as PDF. Clinic identity from `app/src/lib/clinic.ts` and `Brand/nismile-logo.jpg` in `app/public/`. Wired on POS after checkout and Customers recent sales. WhatsApp PDF send stays for later.
+17. **Documents.** Done. English thermal receipt (80 mm default, 58 mm option) and A4 tax invoice from the same sale via `SaleDocumentsModal` + browser print / Save as PDF. Clinic identity from `app/src/lib/clinic.ts` and `Brand/nismile-logo.jpg` in `app/public/`. Wired on POS after checkout and Customers recent sales. **WhatsApp PDF:** sale `receipt_notice` / `invoice_notice` text send also uploads an English A4 PDF via Meta document (`sale-documents` Storage + `send-whatsapp`). Migration `20261017140000_sale_whatsapp_pdf.sql`.
 18. **Returns.** Done once migration + seed are applied. Migration `20261014100000_dental_returns.sql`: `returns` / `return_lines` / `return_refunds`, `process_return` (partial lines, AR credit then tender refunds, optional item restock onto original sale_out batches). UI: Return on POS last-sale banner and Customers recent sales. Points/promotions reverse later when those ledgers exist. Sample: return walk-in item line (`20261014101000_seed_returns_sample.sql` / `node scripts/seed-returns.mjs`).
 
 ### Phase 3 — Appointments and WhatsApp (about 2 weeks)
 
 19. **Patients and calendar.** Done once migration + seed are applied. Migration `20261014110000_dental_appointments.sql`: `appointments` + `create_appointment` / `set_appointment_status` / `complete_appointment` (legacy quick cash path kept in DB). Payment UX: **Checkout in POS** → `/pos?appointment=&customer=&service=` then `link_appointment_sale` (`20261017010000_dental_appointment_pos_checkout.sql`). UI at `/appointments`: week calendar + list, book drawer, status actions. Patients stay on Customers (Retail). Sample: Ayaan Abdi + today/tomorrow slots (`20261014111000_seed_appointments_sample.sql` / `node scripts/seed-appointments.mjs`). WhatsApp send is step 20+.
-20. **Queue.** Done. Migration `20261014120000_dental_notification_queue.sql` plus English-only cutover `20261017020000_dental_whatsapp_english_only.sql`: `message_templates` (English per kind), `notification_queue`, `notification_log`, `enqueue_notification` always picks `language = en`. UI at `/whatsapp`.
+20. **Queue.** Done. Migration `20261014120000_dental_notification_queue.sql` plus English-only cutover `20261017020000_dental_whatsapp_english_only.sql`: `message_templates` (English per kind), `notification_queue`, `notification_log`, `enqueue_notification` always picks `language = en`. UI at `/whatsapp` — Templates tab edits name, body, Meta template name, and status (owner / branch manager / receptionist). Meta Business Manager approval remains required for Cloud API send.
 21. **Utility messages.** Done. Booking → confirmation + 24h/2h reminders; cancel/no-show → cancel notice; `reschedule_appointment`; sales → receipt/invoice notice (opt-in, English).
 22. **Webhook.** Done once migration + function are applied. Migration `20261014140000_dental_whatsapp_webhook.sql`: delivery status, inbound reply `1`=confirm / `2`=cancel, opt-out keywords, simulate RPCs for local testing. Edge Function `supabase/functions/whatsapp-webhook` (GET verify + POST statuses/messages). UI: Simulate delivered / Reply 1·2 / Opt-out on WhatsApp queue. Sample: `20261014141000_seed_whatsapp_webhook_sample.sql` / `node scripts/seed-whatsapp-webhook.mjs`.
-22b. **Send (Cloud API).** Done for the Meta **test number** (+1 555-664-1276 / phone id `1373497502510936`). Migration `20261014150000_dental_send_whatsapp.sql`: `claim_due_notifications`, `mark_notification_failed`, extended `mark_notification_sent`. Edge Function `send-whatsapp`: approved Meta template name when set; otherwise falls back to `hello_world` (free-form text fails outside the 24h window — Meta `#131047`). UI: Process due / Send via Meta on `/whatsapp`. Secrets: `WHATSAPP_ACCESS_TOKEN`, `WHATSAPP_PHONE_NUMBER_ID` (replace with production phone id later). Optional `WHATSAPP_TEST_FALLBACK_TEMPLATE`. Test number Cloud API–registered once. Allowlist recipients until production. Sample: `20261014151000_seed_send_whatsapp_sample.sql` / `node scripts/seed-send-whatsapp.mjs`.
+22b. **Send (Cloud API).** Done. Edge Function `send-whatsapp` + UI Process due. Meta’s **test-number recipient allowlist is console-only** (no Graph API) — add recipients in Meta Developers, or move Edge secrets to the clinic’s production phone id (no recipient cap). Secrets: `WHATSAPP_ACCESS_TOKEN`, `WHATSAPP_PHONE_NUMBER_ID`.
 
 ### Phase 4 — Promotions and loyalty (about 2 weeks)
 
@@ -177,7 +177,28 @@ Work in order. Finish a step before starting the next one inside the same phase.
 
 26. **Reports.** Done. `run_report` covers sales, profit, valuation, expiry, debts, VAT, promos, balance_sheet, expenses, pnl. Period presets plus **custom from/to dates** (`20261017050000_dental_report_custom_range.sql`). Expenses UI at `/expenses`.
 27. **Dashboard.** Done. `dashboard_summary` RPC: today’s sales, appointments list, open AR. Dashboard page shows those KPIs plus existing stock alert counts and attention list. Branch switcher (All branches for owner).
-28. **Go-live.** Done for in-app tracking. Owner Settings → Go-live: checklist (backup, role training, templates reviewed, quality rating), config gaps (VAT/loyalty/MyCash still blank until clinic fills them), template draft/approved counts by language. Meta template approval and production WhatsApp number remain human tasks (step 6).
+28. **Go-live.** Done for in-app tracking. Owner Settings → Go-live: checklist (backup, role training, templates reviewed, quality rating), config gaps (VAT/loyalty/MyCash still blank until clinic fills them), template draft/approved counts by language.
+
+### Phase 6 — WhatsApp one-click send (Meta Cloud API)
+
+29–31. **Twilio attempt.** Superseded. Tried Twilio; left due to Fraud Ops / WABA disable (63112). Code restored to Meta.
+
+32. **Shared helper + sale Send WhatsApp.** Done. `sendWhatsAppNow` + sale **Send WhatsApp** (works with Meta Edge).
+
+33. **AR payment reminder.** Done. Template `payment_due_reminder` (English). RPC `notify_ar_payment_reminder(customer_id, sale_id?)` — account or invoice balance + due date; reuses pending; skips same-day sent. Customers **Send WhatsApp reminder**; Dashboard open-receivables **WhatsApp** per row. Migration `20261017100000_ar_payment_reminder.sql`.
+34. **Appointment WhatsApp buttons.** Done. RPC `notify_appointment_whatsapp(appointment_id, kind)` for confirmation / 24h reminder / 2h reminder (reuse pending, send now). Appointments drawer: **Send confirmation** + **Send reminder**. Cancel RPC returns queue id. Migration `20261017110000_appointment_whatsapp_send.sql`.
+35. **Promotions Send WhatsApp.** Not started.
+36. **Docs + end-to-end test.** Not started (after Meta secrets + healthy WABA).
+
+37. **Meta Cloud API production (human) — current.**
+1. Wait for **M2B TECHNOLOGY (IT SOLUTIONS)** Meta business verification = Verified.
+2. Healthy WABA under M2B (do not reuse a disabled WABA).
+3. Register **second** phone number on Cloud API (not the human-chat SIM).
+4. System user token + **Phone number ID**.
+5. Webhook URL `https://iwnswhnoxbvgyqljfvel.supabase.co/functions/v1/whatsapp-webhook` + verify token.
+6. Edge secrets: `WHATSAPP_ACCESS_TOKEN`, `WHATSAPP_PHONE_NUMBER_ID`, `WHATSAPP_VERIFY_TOKEN`.
+7. English Meta templates → paste names into DentaFlow as approved.
+8. Test Send WhatsApp / Process due.
 
 ## Decisions locked on 2026-10-13
 
@@ -189,8 +210,8 @@ Work in order. Finish a step before starting the next one inside the same phase.
 | VAT | Prices exclude VAT. Rate is a Settings field, still blank. |
 | Loyalty | Earn rate and redeem value are Settings fields, still blank. |
 | Thermal | Both widths. Default 80 mm. |
-| WhatsApp number | New dedicated number. Keep the clinic's current chat number. |
-| Languages | Staff app is English only. WhatsApp message content is English only (Meta `en_US`). |
+| WhatsApp provider | Meta Cloud API. Two numbers: existing = human chat; second = API. |
+| Languages | Staff app is English only. WhatsApp message content is English only. |
 | Promotions | Owner only. Owner picks the branches. |
 | Tenders | Cash, Zaad, eDahab, MyCash (Amal Bank, not cash). |
 | Clinic | N.I SMILE Oral care & Teeth whitening. 26 June Road 1, Hargeisa, Somaliland. Phone +252 63 4749276. Tax ID 11114. Zaad 484594. eDahab 764043. MyCash pending. |
@@ -203,4 +224,4 @@ These do not block the app skeleton.
 2. **VAT percentage.** Needed before real invoices.
 3. **Loyalty rates.** Needed before points go live.
 4. **MyCash account number.** Documents show “Pending” until the clinic has one.
-5. **The dedicated WhatsApp number** once Meta Business verification starts. Human task, parallel with Phase 0.
+5. **Meta Cloud API.** Step 37: second API number + `WHATSAPP_*` secrets after M2B Verified. Do not invent tokens or phone number id.

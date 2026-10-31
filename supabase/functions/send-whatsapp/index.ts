@@ -1,19 +1,27 @@
 /**
- * WhatsApp Cloud API send worker (test number now; swap secrets for production later).
+ * WhatsApp Cloud API send worker (Meta Graph API — two-number production path).
  *
  * Secrets (Edge Function secrets — do not invent):
  * - WHATSAPP_ACCESS_TOKEN   — Meta user/system token with messaging permission
- * - WHATSAPP_PHONE_NUMBER_ID — Cloud API phone number id (test or production)
+ * - WHATSAPP_PHONE_NUMBER_ID — Cloud API phone number id (API number, not chat SIM)
  * - WHATSAPP_GRAPH_VERSION  — optional, default v21.0
+ * - WHATSAPP_TEST_FALLBACK_TEMPLATE — optional, default hello_world
  * - SUPABASE_URL / SUPABASE_ANON_KEY / SUPABASE_SERVICE_ROLE_KEY — platform
  *
- * POST JSON (optional):
- *   { "limit": 10, "queue_id": "<uuid>" }
- * Claims due queue rows (or one id), sends rendered body_text as a Cloud API
- * text message (sandbox / allowlisted recipients). Approved Meta template names
- * in message_templates.whatsapp_template_id use the template API instead.
+ * POST JSON (optional): { "limit": 10, "queue_id": "<uuid>" }
+ * Approved Meta template names in message_templates.whatsapp_template_id use
+ * the template API (en_US). Otherwise free-form text (24h customer window).
+ * Sale receipt/invoice notices also attach an English A4 PDF document.
  */
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.49.1'
+import { appendCareFooter } from '../_shared/whatsapp_care_footer.ts'
+import {
+  buildSalePdf,
+  loadSalePdfInput,
+  readClinicLogoBytes,
+  salePdfFilename,
+  salePdfStoragePath,
+} from '../_shared/sale_pdf.ts'
 
 const cors = {
   'Access-Control-Allow-Origin': '*',
@@ -32,6 +40,8 @@ type ClaimedRow = {
   whatsapp_template_id: string | null
   template_status: string
   template_name: string
+  related_type: string | null
+  related_id: string | null
 }
 
 function json(body: unknown, status = 200) {
@@ -68,8 +78,6 @@ async function sendCloudMessage(input: {
 
   let payload: Record<string, unknown>
 
-  // Approved / fallback Meta template → template send.
-  // Free-form text only works inside the 24h customer-care window (#131047 otherwise).
   if (input.templateName) {
     const keys = Object.keys(input.params)
       .filter((k) => /^\d+$/.test(k))
@@ -78,7 +86,6 @@ async function sendCloudMessage(input: {
       type: 'text',
       text: String(input.params[k] ?? ''),
     }))
-    // Clinic WhatsApp is English-only; Meta English templates use en_US.
     payload = {
       messaging_product: 'whatsapp',
       to: input.to,
@@ -124,6 +131,130 @@ async function sendCloudMessage(input: {
   return { id, raw }
 }
 
+async function uploadMetaMedia(input: {
+  token: string
+  phoneNumberId: string
+  graphVersion: string
+  filename: string
+  bytes: Uint8Array
+}): Promise<string> {
+  const url =
+    `https://graph.facebook.com/${input.graphVersion}/` +
+    `${input.phoneNumberId}/media`
+  const form = new FormData()
+  form.append('messaging_product', 'whatsapp')
+  form.append('type', 'application/pdf')
+  form.append(
+    'file',
+    new Blob([input.bytes], { type: 'application/pdf' }),
+    input.filename,
+  )
+  const res = await fetch(url, {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${input.token}` },
+    body: form,
+  })
+  const raw = await res.json().catch(() => ({}))
+  if (!res.ok) {
+    const err =
+      (raw as { error?: { message?: string } })?.error?.message ||
+      `Meta media HTTP ${res.status}`
+    throw new Error(err)
+  }
+  const id = (raw as { id?: string }).id || ''
+  if (!id) throw new Error('Meta media response missing id')
+  return id
+}
+
+async function sendDocumentMessage(input: {
+  token: string
+  phoneNumberId: string
+  graphVersion: string
+  to: string
+  mediaId: string
+  filename: string
+  caption?: string
+}): Promise<{ id: string; raw: unknown }> {
+  const url =
+    `https://graph.facebook.com/${input.graphVersion}/` +
+    `${input.phoneNumberId}/messages`
+  const res = await fetch(url, {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${input.token}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      messaging_product: 'whatsapp',
+      to: input.to,
+      type: 'document',
+      document: {
+        id: input.mediaId,
+        filename: input.filename,
+        ...(input.caption ? { caption: input.caption.slice(0, 1024) } : {}),
+      },
+    }),
+  })
+  const raw = await res.json().catch(() => ({}))
+  if (!res.ok) {
+    const err =
+      (raw as { error?: { message?: string } })?.error?.message ||
+      `Meta document HTTP ${res.status}`
+    throw new Error(err)
+  }
+  const id =
+    (raw as { messages?: { id?: string }[] })?.messages?.[0]?.id || ''
+  if (!id) throw new Error('Meta document response missing message id')
+  return { id, raw }
+}
+
+async function ensureSalePdfBytes(input: {
+  // deno-lint-ignore no-explicit-any
+  dental: any
+  // deno-lint-ignore no-explicit-any
+  storage: any
+  branchId: string
+  saleId: string
+}): Promise<{
+  bytes: Uint8Array
+  filename: string
+  storagePath: string
+  reused: boolean
+} | null> {
+  const sale = await loadSalePdfInput(input.dental, input.saleId)
+  if (!sale) return null
+  const filename = salePdfFilename(sale)
+  const storagePath = salePdfStoragePath({
+    branch_id: input.branchId,
+    sale_id: input.saleId,
+    receipt_number: sale.receipt_number,
+    price_list: sale.price_list,
+  })
+
+  const existing = await input.storage
+    .from('sale-documents')
+    .download(storagePath)
+  if (!existing.error && existing.data) {
+    const bytes = new Uint8Array(await existing.data.arrayBuffer())
+    if (bytes.length > 0) {
+      return { bytes, filename, storagePath, reused: true }
+    }
+  }
+
+  const logo = readClinicLogoBytes()
+  const bytes = await buildSalePdf(sale, logo)
+  const uploaded = await input.storage
+    .from('sale-documents')
+    .upload(storagePath, bytes, {
+      contentType: 'application/pdf',
+      upsert: true,
+    })
+  if (uploaded.error) {
+    console.warn('sale-documents upload failed:', uploaded.error.message)
+  }
+  return { bytes, filename, storagePath, reused: false }
+}
+
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: cors })
@@ -146,7 +277,7 @@ Deno.serve(async (req) => {
     return json(
       {
         error:
-          'WhatsApp send secrets missing. Set WHATSAPP_ACCESS_TOKEN and WHATSAPP_PHONE_NUMBER_ID (test number id is fine until production).',
+          'WhatsApp send secrets missing. Set WHATSAPP_ACCESS_TOKEN and WHATSAPP_PHONE_NUMBER_ID.',
       },
       503,
     )
@@ -171,6 +302,9 @@ Deno.serve(async (req) => {
 
   const dental = createClient(supabaseUrl, serviceKey, {
     db: { schema: 'dental' },
+    auth: { persistSession: false, autoRefreshToken: false },
+  })
+  const storageClient = createClient(supabaseUrl, serviceKey, {
     auth: { persistSession: false, autoRefreshToken: false },
   })
 
@@ -223,14 +357,14 @@ Deno.serve(async (req) => {
 
   for (const row of rows) {
     const to = digitsOnlyPhone(row.phone)
-    const bodyText = renderBody(row.body_text, row.params ?? {})
-    // Approved Meta template name when set. Otherwise try draft body as free-form
-    // text (works inside the 24h window). If Meta rejects (#131047), fall back to
-    // hello_world so cold / out-of-window sends still deliver on the test number.
+    const bodyText = appendCareFooter(
+      renderBody(row.body_text, row.params ?? {}),
+    )
     const approvedName =
       row.template_status === 'approved' &&
       row.whatsapp_template_id &&
-      row.whatsapp_template_id.trim().length > 0
+      row.whatsapp_template_id.trim().length > 0 &&
+      !/^HX[0-9a-fA-F]+$/i.test(row.whatsapp_template_id.trim())
         ? row.whatsapp_template_id.trim()
         : null
     const fallbackTemplate =
@@ -257,7 +391,6 @@ Deno.serve(async (req) => {
       } catch (textErr) {
         if (approvedName) throw textErr
         const msg = textErr instanceof Error ? textErr.message : String(textErr)
-        // Outside care window or other free-form block → Meta sample template.
         sent = await sendCloudMessage({
           token: accessToken,
           phoneNumberId,
@@ -273,15 +406,75 @@ Deno.serve(async (req) => {
         console.warn('send-whatsapp text failed, used fallback:', msg)
       }
 
+      let pdfPayload: Record<string, unknown> | null = null
+      const wantsPdf =
+        mode === 'text' &&
+        row.related_type === 'sale' &&
+        !!row.related_id &&
+        (row.kind === 'receipt_notice' || row.kind === 'invoice_notice')
+
+      if (wantsPdf) {
+        try {
+          const pdf = await ensureSalePdfBytes({
+            dental,
+            storage: storageClient.storage,
+            branchId: row.branch_id,
+            saleId: row.related_id!,
+          })
+          if (!pdf) throw new Error('Sale not found for PDF')
+          const mediaId = await uploadMetaMedia({
+            token: accessToken,
+            phoneNumberId,
+            graphVersion,
+            filename: pdf.filename,
+            bytes: pdf.bytes,
+          })
+          const docSent = await sendDocumentMessage({
+            token: accessToken,
+            phoneNumberId,
+            graphVersion,
+            to,
+            mediaId,
+            filename: pdf.filename,
+            caption:
+              row.kind === 'invoice_notice'
+                ? 'Your N.I SMILE tax invoice (PDF)'
+                : 'Your N.I SMILE receipt (PDF)',
+          })
+          pdfPayload = {
+            media_id: mediaId,
+            document_message_id: docSent.id,
+            filename: pdf.filename,
+            storage_path: pdf.storagePath,
+            reused: pdf.reused,
+            meta: docSent.raw,
+          }
+        } catch (pdfErr) {
+          const message =
+            pdfErr instanceof Error ? pdfErr.message : String(pdfErr)
+          console.warn('sale PDF WhatsApp failed:', message)
+          pdfPayload = { error: message }
+        }
+      }
+
       const { error: markErr } = await dental.rpc('mark_notification_sent', {
         p_queue_id: row.queue_id,
         p_provider_message_id: sent.id,
         p_body_preview: bodyText.slice(0, 280),
         p_payload: {
           source: 'send-whatsapp',
+          provider: 'meta_cloud_api',
           mode,
           template_name: templateName,
           meta: sent.raw,
+          ...(pdfPayload
+            ? {
+                pdf: pdfPayload.error
+                  ? { error: pdfPayload.error }
+                  : pdfPayload,
+                pdf_error: pdfPayload.error ?? null,
+              }
+            : {}),
         },
       })
       if (markErr) throw new Error(markErr.message)
@@ -292,6 +485,15 @@ Deno.serve(async (req) => {
         provider_message_id: sent.id,
         mode,
         template_name: templateName,
+        pdf: pdfPayload
+          ? pdfPayload.error
+            ? { ok: false, error: pdfPayload.error }
+            : {
+                ok: true,
+                filename: pdfPayload.filename,
+                document_message_id: pdfPayload.document_message_id,
+              }
+          : null,
       })
     } catch (e) {
       const message = e instanceof Error ? e.message : String(e)

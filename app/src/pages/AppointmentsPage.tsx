@@ -5,6 +5,7 @@ import {
   Check,
   ChevronLeft,
   ChevronRight,
+  MessageSquare,
   Plus,
   User,
   X,
@@ -18,11 +19,14 @@ import {
   createBranchDentist,
   fetchAppointments,
   fetchDentists,
+  notifyAppointmentWhatsApp,
   rescheduleAppointment,
   setAppointmentStatus,
   startOfWeek,
   toDateKey,
+  type AppointmentWhatsAppKind,
 } from '../lib/appointments/api.ts'
+import { sendWhatsAppNow } from '../lib/notifications/api.ts'
 import {
   APPOINTMENT_STATUS_LABELS,
   type Appointment,
@@ -72,6 +76,7 @@ export function AppointmentsPage() {
   const [rescheduleDate, setRescheduleDate] = useState('')
   const [rescheduleTime, setRescheduleTime] = useState('')
   const [info, setInfo] = useState<string | null>(null)
+  const [waNotice, setWaNotice] = useState<string | null>(null)
 
   const weekStart = weekAnchor
   const weekDays = useMemo(
@@ -183,6 +188,35 @@ export function AppointmentsPage() {
     onError: (err: Error) => setError(err.message),
   })
 
+  const waMutation = useMutation({
+    mutationFn: async ({
+      appointmentId,
+      kind,
+    }: {
+      appointmentId: string
+      kind: AppointmentWhatsAppKind
+    }) =>
+      sendWhatsAppNow(() => notifyAppointmentWhatsApp(appointmentId, kind)),
+    onSuccess: (result) => {
+      if (result.skipped) {
+        setWaNotice(
+          result.reason ??
+            'Nothing queued — opted out, missing phone, closed visit, or already sent today.',
+        )
+        return
+      }
+      const row = result.send?.results?.[0]
+      if (row && !row.ok) {
+        setWaNotice(`WhatsApp send failed: ${row.error ?? 'unknown error'}`)
+        return
+      }
+      setWaNotice('WhatsApp notice sent via Cloud API.')
+      void queryClient.invalidateQueries({ queryKey: ['notification_queue'] })
+      void queryClient.invalidateQueries({ queryKey: ['notification_log'] })
+    },
+    onError: (err: Error) => setWaNotice(err.message),
+  })
+
   function checkoutInPos(apt: Appointment) {
     const params = new URLSearchParams({
       appointment: apt.id,
@@ -278,7 +312,7 @@ export function AppointmentsPage() {
         <div>
           <h1 className="text-3xl font-semibold">Appointments</h1>
           <p className="mt-1 text-sm text-muted">
-            Retail patients, dentist calendar, and visit status. WhatsApp reminders come next.
+            Retail patients, dentist calendar, and one-click WhatsApp confirmation / reminder.
           </p>
         </div>
         <button
@@ -828,6 +862,60 @@ export function AppointmentsPage() {
 
             {selected.status === 'scheduled' || selected.status === 'confirmed' ? (
               <div className="space-y-2 rounded-dentaflow border border-line bg-canvas p-3">
+                <p className="text-xs font-bold">WhatsApp</p>
+                <div className="flex flex-wrap gap-2">
+                  <button
+                    type="button"
+                    disabled={waMutation.isPending || !selected.customer_phone}
+                    onClick={() => {
+                      setWaNotice(null)
+                      waMutation.mutate({
+                        appointmentId: selected.id,
+                        kind: 'appointment_confirmation',
+                      })
+                    }}
+                    className="inline-flex h-9 flex-1 items-center justify-center gap-1.5 rounded-dentaflow bg-marine px-3 text-xs font-bold text-white disabled:opacity-60"
+                  >
+                    <MessageSquare className="h-3.5 w-3.5" />
+                    {waMutation.isPending ? 'Sending…' : 'Send confirmation'}
+                  </button>
+                  <button
+                    type="button"
+                    disabled={waMutation.isPending || !selected.customer_phone}
+                    onClick={() => {
+                      setWaNotice(null)
+                      waMutation.mutate({
+                        appointmentId: selected.id,
+                        kind: 'appointment_reminder_24h',
+                      })
+                    }}
+                    className="inline-flex h-9 flex-1 items-center justify-center gap-1.5 rounded-dentaflow border border-line px-3 text-xs font-bold disabled:opacity-60"
+                  >
+                    <MessageSquare className="h-3.5 w-3.5" />
+                    {waMutation.isPending ? 'Sending…' : 'Send reminder'}
+                  </button>
+                </div>
+                {waNotice ? (
+                  <p
+                    className={`text-[11px] font-semibold ${
+                      waNotice.startsWith('WhatsApp notice sent')
+                        ? 'text-status-green'
+                        : 'text-status-amber'
+                    }`}
+                  >
+                    {waNotice}
+                  </p>
+                ) : null}
+                {!selected.customer_phone ? (
+                  <p className="text-[11px] text-status-amber">
+                    Patient needs a phone number to send WhatsApp.
+                  </p>
+                ) : null}
+              </div>
+            ) : null}
+
+            {selected.status === 'scheduled' || selected.status === 'confirmed' ? (
+              <div className="space-y-2 rounded-dentaflow border border-line bg-canvas p-3">
                 <p className="text-xs font-bold">Reschedule</p>
                 <div className="grid grid-cols-2 gap-2">
                   <label className="block text-[11px] font-semibold">
@@ -864,8 +952,9 @@ export function AppointmentsPage() {
             ) : null}
 
             <p className="text-[11px] text-muted">
-              Opted-in patients get English confirmation, 24h/2h reminders, and
-              cancel/reschedule notices in the WhatsApp queue.
+              Booking still auto-queues confirmation and 24h/2h reminders. Use the
+              buttons above to send confirmation or a reminder now. Cancel and
+              reschedule still enqueue notices when the status changes.
             </p>
           </div>
         ) : null}

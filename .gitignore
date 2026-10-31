@@ -1,0 +1,31 @@
+# Local env and secrets
+.env
+.env.*
+!.env.example
+app/.env.local
+
+# Dependencies / build
+node_modules/
+app/node_modules/
+app/dist/
+**/dist/
+
+# Supabase CLI junk
+supabase/.temp/
+
+# OS / editor
+.DS_Store
+Thumbs.db
+*.swp
+.idea/
+.vscode/*
+!.vscode/extensions.json
+
+# Logs
+*.log
+npm-debug.log*
+
+# Local smoke / temp scripts
+scripts/_tmp_*
+scripts/_smoke_*
+scripts/_logo.b64.txt

@@ -347,6 +347,69 @@ export function PosPage() {
   }, [tenders])
 
   const remaining = round2(Math.max(0, cartTotals.total - paidTotal))
+  const overpaid = paidTotal > cartTotals.total + 0.009
+
+  // If cart total drops (qty/loyalty/promo), shrink tender amounts so paid never exceeds total.
+  useEffect(() => {
+    setTenders((current) => {
+      let budget = cartTotals.total
+      let changed = false
+      const next: TenderDraft = { ...current }
+      for (const tender of Object.keys(TENDER_LABELS) as PaymentTender[]) {
+        const raw = next[tender]
+        if (!raw.trim()) continue
+        const n = Number(raw)
+        if (!Number.isFinite(n) || n <= 0) {
+          if (raw !== '') {
+            next[tender] = ''
+            changed = true
+          }
+          continue
+        }
+        if (n > budget + 0.0001) {
+          next[tender] = budget > 0.0001 ? String(round2(budget)) : ''
+          changed = true
+          budget = 0
+        } else {
+          budget = round2(budget - n)
+        }
+      }
+      return changed ? next : current
+    })
+  }, [cartTotals.total])
+
+  function tenderOthersPaid(current: TenderDraft, tender: PaymentTender) {
+    return round2(
+      (Object.keys(current) as PaymentTender[]).reduce((sum, key) => {
+        if (key === tender) return sum
+        const n = Number(current[key])
+        return sum + (Number.isFinite(n) && n > 0 ? n : 0)
+      }, 0),
+    )
+  }
+
+  function maxForTender(tender: PaymentTender) {
+    return round2(Math.max(0, cartTotals.total - tenderOthersPaid(tenders, tender)))
+  }
+
+  function setTenderAmount(tender: PaymentTender, raw: string) {
+    if (raw.trim() === '') {
+      setTenders((current) => ({ ...current, [tender]: '' }))
+      return
+    }
+    // Allow in-progress decimals like "12." while typing.
+    if (!/^\d*\.?\d{0,2}$/.test(raw)) return
+    const n = Number(raw)
+    if (!Number.isFinite(n) || n < 0) return
+
+    setTenders((current) => {
+      const max = round2(Math.max(0, cartTotals.total - tenderOthersPaid(current, tender)))
+      if (n > max + 0.0001) {
+        return { ...current, [tender]: max > 0.0001 ? String(max) : '' }
+      }
+      return { ...current, [tender]: raw }
+    })
+  }
 
   const onAccountAmount =
     isWholesale && chargeToAccount ? remaining : remaining > 0 && !isWholesale ? remaining : 0
@@ -360,6 +423,15 @@ export function PosPage() {
         }))
         .filter((row) => Number.isFinite(row.amount) && row.amount > 0)
       if (cart.length === 0) throw new Error('Cart is empty.')
+      if (cartTotals.total <= 0) throw new Error('Sale total must be greater than zero.')
+      if (payments.some((row) => row.amount <= 0)) {
+        throw new Error('Payment amounts must be positive.')
+      }
+      if (paidTotal > cartTotals.total + 0.009) {
+        throw new Error(
+          `Paid total (${paidTotal.toFixed(2)}) cannot exceed sale total (${cartTotals.total.toFixed(2)}).`,
+        )
+      }
 
       const unpaid = round2(cartTotals.total - paidTotal)
       if (unpaid > 0.009) {
@@ -545,14 +617,7 @@ export function PosPage() {
   }
 
   function fillRemaining(tender: PaymentTender) {
-    const others = round2(
-      (Object.keys(tenders) as PaymentTender[]).reduce((sum, key) => {
-        if (key === tender) return sum
-        const n = Number(tenders[key])
-        return sum + (Number.isFinite(n) && n > 0 ? n : 0)
-      }, 0),
-    )
-    const need = round2(Math.max(0, cartTotals.total - others))
+    const need = maxForTender(tender)
     setTenders((current) => ({ ...current, [tender]: need > 0 ? String(need) : '' }))
   }
 
@@ -1016,11 +1081,11 @@ export function PosPage() {
                   <input
                     type="number"
                     min="0"
+                    max={maxForTender(tender)}
                     step="0.01"
+                    inputMode="decimal"
                     value={tenders[tender]}
-                    onChange={(event) =>
-                      setTenders((current) => ({ ...current, [tender]: event.target.value }))
-                    }
+                    onChange={(event) => setTenderAmount(tender, event.target.value)}
                     placeholder="0.00"
                     className="mt-1 h-9 w-full rounded-md border border-line bg-surface px-2 font-mono text-sm"
                   />
@@ -1029,7 +1094,11 @@ export function PosPage() {
             </div>
             <div className="flex justify-between text-xs">
               <span className="text-muted">Paid</span>
-              <span className="font-mono font-bold">{formatMoney(paidTotal)}</span>
+              <span
+                className={`font-mono font-bold ${overpaid ? 'text-status-red' : ''}`}
+              >
+                {formatMoney(paidTotal)}
+              </span>
             </div>
             <div className="flex justify-between text-xs">
               <span className="text-muted">Remaining</span>
@@ -1039,6 +1108,11 @@ export function PosPage() {
                 {formatMoney(remaining)}
               </span>
             </div>
+            {overpaid ? (
+              <p className="text-[11px] font-semibold text-status-red">
+                Paid cannot exceed sale total ({formatMoney(cartTotals.total)}).
+              </p>
+            ) : null}
           </div>
 
           {isWholesale ? (
@@ -1073,7 +1147,7 @@ export function PosPage() {
 
           <button
             type="button"
-            disabled={checkoutMutation.isPending || cart.length === 0}
+            disabled={checkoutMutation.isPending || cart.length === 0 || overpaid}
             onClick={() => checkoutMutation.mutate()}
             className="h-11 w-full rounded-dentaflow bg-marine text-sm font-bold text-white disabled:opacity-60"
           >
@@ -1097,6 +1171,6 @@ function round2(n: number) {
 
 function defaultDueDate() {
   const d = new Date()
-  d.setDate(d.getDate() + 30)
+  d.setDate(d.getDate() + 7)
   return d.toISOString().slice(0, 10)
 }

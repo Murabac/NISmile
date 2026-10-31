@@ -42,15 +42,36 @@ values
 (
   'receipt_notice', 'en',
   'Receipt notice (English)', 'utility',
-  E'Dear {{1}},\n\nThank you. Your N.I SMILE receipt #{{2}} totals ${{3}}. The PDF is in English.',
-  '["customer_name","receipt_number","amount"]'::jsonb,
+  E'Dear {{1}},\n\nYour N.I SMILE receipt #{{2}} totals ${{3}}.\nYou have paid: ${{4}}.\nYour open balance: ${{5}}. Please pay it on time.\nDue date: {{6}}.',
+  '["customer_name","receipt_number","amount_total","amount_paid","open_balance","due_date"]'::jsonb,
   'draft'
 ),
 (
   'invoice_notice', 'en',
   'Invoice notice (English)', 'utility',
-  E'Dear {{1}},\n\nYour N.I SMILE invoice #{{2}} totals ${{3}}. The PDF is in English.',
-  '["customer_name","invoice_number","amount"]'::jsonb,
+  E'Dear {{1}},\n\nYour N.I SMILE invoice #{{2}} totals ${{3}}.\nYou have paid: ${{4}}.\nYour open balance: ${{5}}. Please pay it on time.\nDue date: {{6}}.',
+  '["customer_name","invoice_number","amount_total","amount_paid","open_balance","due_date"]'::jsonb,
+  'draft'
+),
+(
+  'payment_due_reminder', 'en',
+  'Payment due reminder (English)', 'utility',
+  E'Dear {{1}},\n\nThis is a payment reminder from N.I SMILE Oral care & Teeth whitening.\nOpen balance: ${{2}}.\nPlease pay it on time.\nDue date: {{3}}.',
+  '["customer_name","open_balance","due_date"]'::jsonb,
+  'draft'
+),
+(
+  'appointment_reply_confirmed', 'en',
+  'Appointment reply confirmed (English)', 'utility',
+  E'Thank you {{1}}. Your appointment on {{2}} at {{3}} is confirmed. We look forward to seeing you at N.I SMILE.',
+  '["patient_name","date","time"]'::jsonb,
+  'draft'
+),
+(
+  'appointment_reply_cancelled', 'en',
+  'Appointment reply cancelled (English)', 'utility',
+  E'Thank you {{1}}. Your appointment on {{2}} at {{3}} has been cancelled. Contact us if you want to book again.',
+  '["patient_name","date","time"]'::jsonb,
   'draft'
 )
 on conflict (kind, language) do nothing;

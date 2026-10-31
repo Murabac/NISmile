@@ -60,8 +60,11 @@ export const KIND_LABELS: Record<string, string> = {
   appointment_reminder_2h: 'Reminder (2h)',
   appointment_reschedule: 'Reschedule notice',
   appointment_cancel: 'Cancel notice',
+  appointment_reply_confirmed: 'Reply ack — confirmed',
+  appointment_reply_cancelled: 'Reply ack — cancelled',
   receipt_notice: 'Receipt notice',
   invoice_notice: 'Invoice notice',
+  payment_due_reminder: 'Payment due reminder',
   promotion_announcement: 'Promotion announcement',
   promotion_ending_soon: 'Promotion ending soon',
 }
@@ -72,4 +75,11 @@ export const QUEUE_STATUS_LABELS: Record<QueueStatus, string> = {
   sent: 'Sent',
   failed: 'Failed',
   cancelled: 'Cancelled',
+}
+
+export const TEMPLATE_STATUS_LABELS: Record<TemplateApprovalStatus, string> = {
+  draft: 'Draft',
+  pending: 'Pending Meta',
+  approved: 'Approved',
+  rejected: 'Rejected',
 }

@@ -75,6 +75,19 @@ export async function notifySaleDocument(saleId: string): Promise<string | null>
   return (data as string | null) ?? null
 }
 
+/** Enqueue (or reuse pending) AR payment due reminder; returns queue id. */
+export async function notifyArPaymentReminder(input: {
+  customerId: string
+  saleId?: string | null
+}): Promise<string | null> {
+  const { data, error } = await supabase.rpc('notify_ar_payment_reminder', {
+    p_customer_id: input.customerId,
+    p_sale_id: input.saleId ?? null,
+  })
+  if (error) throw error
+  return (data as string | null) ?? null
+}
+
 export async function processReturn(input: ProcessReturnInput): Promise<string> {
   const { data, error } = await supabase.rpc('process_return', {
     p_branch_id: input.branchId,

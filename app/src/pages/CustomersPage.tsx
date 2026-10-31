@@ -1,10 +1,11 @@
 import { useMemo, useState, type FormEvent } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { FileText, Plus, Printer, RotateCcw, Search, Users, X } from 'lucide-react'
+import { FileText, MessageSquare, Plus, Printer, RotateCcw, Search, Users, X } from 'lucide-react'
 import { Drawer } from '../components/Drawer.tsx'
 import { ReturnDrawer } from '../components/ReturnDrawer.tsx'
 import { SaleDocumentsModal } from '../components/SaleDocumentsModal.tsx'
 import { useAuth } from '../lib/auth.tsx'
+import { sendWhatsAppNow } from '../lib/notifications/api.ts'
 import {
   CLINIC_ADDRESS,
   CLINIC_EDAHAB,
@@ -29,6 +30,7 @@ import {
   applyCustomerPayment,
   fetchCustomerSales,
   fetchCustomerStatement,
+  notifyArPaymentReminder,
 } from '../lib/sales/api.ts'
 import {
   TENDER_LABELS,
@@ -54,6 +56,7 @@ export function CustomersPage() {
   const [statementOpen, setStatementOpen] = useState(false)
   const [formError, setFormError] = useState<string | null>(null)
   const [payError, setPayError] = useState<string | null>(null)
+  const [waNotice, setWaNotice] = useState<string | null>(null)
   const [tenders, setTenders] = useState<TenderDraft>(emptyTenders())
   const [paySaleId, setPaySaleId] = useState<string>('all')
   const [docSale, setDocSale] = useState<Sale | null>(null)
@@ -142,6 +145,36 @@ export function CustomersPage() {
       await queryClient.invalidateQueries({ queryKey: ['sales'] })
     },
     onError: (err: Error) => setPayError(err.message),
+  })
+
+  const arWaMutation = useMutation({
+    mutationFn: async (saleId: string | null) => {
+      if (!selected) throw new Error('No customer selected')
+      return sendWhatsAppNow(() =>
+        notifyArPaymentReminder({
+          customerId: selected.id,
+          saleId,
+        }),
+      )
+    },
+    onSuccess: (result) => {
+      if (result.skipped) {
+        setWaNotice(
+          result.reason ??
+            'Nothing queued — opted out, missing phone, no open balance, or already reminded today.',
+        )
+        return
+      }
+      const row = result.send?.results?.[0]
+      if (row && !row.ok) {
+        setWaNotice(`WhatsApp send failed: ${row.error ?? 'unknown error'}`)
+        return
+      }
+      setWaNotice('Payment reminder sent via Cloud API.')
+      void queryClient.invalidateQueries({ queryKey: ['notification_queue'] })
+      void queryClient.invalidateQueries({ queryKey: ['notification_log'] })
+    },
+    onError: (err: Error) => setWaNotice(err.message),
   })
 
   function openCreate() {
@@ -380,7 +413,34 @@ export function CustomersPage() {
                   <FileText className="h-3.5 w-3.5" />
                   Statement
                 </button>
+                {(selected.ar_balance ?? 0) > 0.009 && selected.whatsapp_opt_in ? (
+                  <button
+                    type="button"
+                    disabled={arWaMutation.isPending}
+                    onClick={() => {
+                      setWaNotice(null)
+                      arWaMutation.mutate(
+                        paySaleId !== 'all' ? paySaleId : null,
+                      )
+                    }}
+                    className="inline-flex h-10 items-center gap-2 rounded-dentaflow bg-marine px-4 text-sm font-bold text-white disabled:opacity-60"
+                  >
+                    <MessageSquare className="h-3.5 w-3.5" />
+                    {arWaMutation.isPending ? 'Sending…' : 'Send WhatsApp reminder'}
+                  </button>
+                ) : null}
               </div>
+              {waNotice ? (
+                <p
+                  className={`text-xs font-semibold ${
+                    waNotice.startsWith('Payment reminder sent')
+                      ? 'text-status-green'
+                      : 'text-status-amber'
+                  }`}
+                >
+                  {waNotice}
+                </p>
+              ) : null}
 
               {(salesQuery.data?.length ?? 0) > 0 ? (
                 <div className="space-y-2 border-t border-line pt-3">

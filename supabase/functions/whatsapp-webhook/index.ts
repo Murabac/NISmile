@@ -1,15 +1,19 @@
 /**
- * WhatsApp Cloud API webhook (step 22).
+ * WhatsApp Cloud API webhook (Meta — two-number production path).
  *
- * Secrets (set in Supabase Edge Function secrets — do not invent values):
+ * Secrets (Edge Function secrets — do not invent):
  * - WHATSAPP_VERIFY_TOKEN  — Meta webhook verify token
+ * - WHATSAPP_ACCESS_TOKEN / WHATSAPP_PHONE_NUMBER_ID — send reply acks
+ * - WHATSAPP_GRAPH_VERSION — optional, default v21.0
  * - WHATSAPP_APP_SECRET    — optional, for X-Hub-Signature-256 (future)
- * - SUPABASE_URL / SUPABASE_SERVICE_ROLE_KEY — provided by the platform
+ * - SUPABASE_URL / SUPABASE_SERVICE_ROLE_KEY — platform
  *
  * GET  — Meta subscription verification
- * POST — delivery statuses + inbound messages (1 confirm / 2 cancel / opt-out)
+ * POST — delivery statuses + inbound (1 confirm / 2 cancel / opt-out)
+ *         After 1/2, queues + sends an ack of their choice when secrets exist.
  */
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.49.1'
+import { appendCareFooter } from '../_shared/whatsapp_care_footer.ts'
 
 const cors = {
   'Access-Control-Allow-Origin': '*',
@@ -21,6 +25,87 @@ function json(body: unknown, status = 200) {
     status,
     headers: { ...cors, 'Content-Type': 'application/json' },
   })
+}
+
+function renderBody(body: string, params: Record<string, unknown>): string {
+  return body.replace(/\{\{(\d+)\}\}/g, (_, num: string) => {
+    const v = params[num]
+    return v != null ? String(v) : `{{${num}}}`
+  })
+}
+
+async function sendAckQueueRow(
+  // deno-lint-ignore no-explicit-any
+  dental: any,
+  queueId: string,
+): Promise<{ ok: boolean; error?: string; provider_message_id?: string }> {
+  const accessToken = Deno.env.get('WHATSAPP_ACCESS_TOKEN')
+  const phoneNumberId = Deno.env.get('WHATSAPP_PHONE_NUMBER_ID')
+  const graphVersion = Deno.env.get('WHATSAPP_GRAPH_VERSION') || 'v21.0'
+  if (!accessToken || !phoneNumberId) {
+    return { ok: false, error: 'WhatsApp send secrets missing for ack' }
+  }
+
+  const { data: claimed, error: claimErr } = await dental.rpc(
+    'claim_due_notifications',
+    { p_limit: 1, p_queue_id: queueId },
+  )
+  if (claimErr) return { ok: false, error: claimErr.message }
+  const row = (claimed ?? [])[0] as
+    | {
+        queue_id: string
+        phone: string
+        body_text: string
+        params: Record<string, unknown>
+      }
+    | undefined
+  if (!row) return { ok: false, error: 'Ack queue row not claimable' }
+
+  const to = String(row.phone || '').replace(/[^\d]/g, '')
+  const bodyText = appendCareFooter(
+    renderBody(row.body_text, row.params ?? {}),
+  )
+  const url =
+    `https://graph.facebook.com/${graphVersion}/` +
+    `${phoneNumberId}/messages`
+  const res = await fetch(url, {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${accessToken}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      messaging_product: 'whatsapp',
+      to,
+      type: 'text',
+      text: { preview_url: false, body: bodyText.slice(0, 4096) },
+    }),
+  })
+  const raw = await res.json().catch(() => ({}))
+  if (!res.ok) {
+    const message =
+      (raw as { error?: { message?: string } })?.error?.message ||
+      `Meta HTTP ${res.status}`
+    await dental.rpc('mark_notification_failed', {
+      p_queue_id: row.queue_id,
+      p_error_message: message,
+    })
+    return { ok: false, error: message }
+  }
+  const id =
+    (raw as { messages?: { id?: string }[] })?.messages?.[0]?.id || ''
+  await dental.rpc('mark_notification_sent', {
+    p_queue_id: row.queue_id,
+    p_provider_message_id: id,
+    p_body_preview: bodyText.slice(0, 280),
+    p_payload: {
+      source: 'whatsapp-webhook-ack',
+      provider: 'meta_cloud_api',
+      mode: 'text',
+      meta: raw,
+    },
+  })
+  return { ok: true, provider_message_id: id }
 }
 
 Deno.serve(async (req) => {
@@ -125,7 +210,21 @@ Deno.serve(async (req) => {
           p_provider_message_id: msg.id ?? null,
           p_raw: msg,
         })
-        results.push({ type: 'inbound', from, data, error: error?.message })
+        const inbound: Record<string, unknown> = {
+          type: 'inbound',
+          from,
+          data,
+          error: error?.message,
+        }
+        const ackQueueId =
+          data && typeof data === 'object'
+            ? (data as { ack_queue_id?: string | null }).ack_queue_id
+            : null
+        if (ackQueueId) {
+          const ack = await sendAckQueueRow(dental, ackQueueId)
+          inbound.ack = ack
+        }
+        results.push(inbound)
       }
     }
   }

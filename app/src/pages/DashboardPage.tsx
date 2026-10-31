@@ -1,10 +1,11 @@
-import { useMemo, type ReactNode } from 'react'
-import { useQuery } from '@tanstack/react-query'
+import { useMemo, useState, type ReactNode } from 'react'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import {
   AlertTriangle,
   ArrowRight,
   CalendarDays,
   Clock,
+  MessageSquare,
   Package,
   Receipt,
   Wallet,
@@ -14,7 +15,9 @@ import { useAuth } from '../lib/auth.tsx'
 import { fetchItems } from '../lib/catalog/api.ts'
 import type { CatalogItem } from '../lib/catalog/types.ts'
 import { formatMoney } from '../lib/money.ts'
+import { sendWhatsAppNow } from '../lib/notifications/api.ts'
 import { fetchDashboardSummary } from '../lib/reports/api.ts'
+import { notifyArPaymentReminder } from '../lib/sales/api.ts'
 import {
   alertStatusClass,
   alertStatusLabel,
@@ -25,6 +28,8 @@ import { fetchBranchStockSummaries, fetchOpenBatches } from '../lib/stock/api.ts
 
 export function DashboardPage() {
   const { branchId, branches } = useAuth()
+  const queryClient = useQueryClient()
+  const [waNotice, setWaNotice] = useState<string | null>(null)
   const branchLabel =
     branchId === 'all'
       ? 'All branches'
@@ -33,6 +38,33 @@ export function DashboardPage() {
   const summaryQuery = useQuery({
     queryKey: ['dashboard_summary', branchId],
     queryFn: () => fetchDashboardSummary(branchId),
+  })
+
+  const arWaMutation = useMutation({
+    mutationFn: async (input: { customerId: string; saleId: string }) =>
+      sendWhatsAppNow(() =>
+        notifyArPaymentReminder({
+          customerId: input.customerId,
+          saleId: input.saleId,
+        }),
+      ),
+    onSuccess: (result) => {
+      if (result.skipped) {
+        setWaNotice(
+          result.reason ??
+            'Nothing queued — opted out, missing phone, or already reminded today.',
+        )
+        return
+      }
+      const row = result.send?.results?.[0]
+      if (row && !row.ok) {
+        setWaNotice(`WhatsApp send failed: ${row.error ?? 'unknown error'}`)
+        return
+      }
+      setWaNotice('Payment reminder sent via Cloud API.')
+      void queryClient.invalidateQueries({ queryKey: ['notification_queue'] })
+    },
+    onError: (err: Error) => setWaNotice(err.message),
   })
 
   const itemsQuery = useQuery({ queryKey: ['items'], queryFn: fetchItems })
@@ -197,26 +229,53 @@ export function DashboardPage() {
           ) : (summary?.debt_rows.length ?? 0) === 0 ? (
             <p className="px-4 py-8 text-sm text-muted">No open AR for this filter.</p>
           ) : (
-            <ul className="divide-y divide-line">
-              {summary!.debt_rows.map((row) => (
-                <li
-                  key={row.receipt_number}
-                  className="flex flex-wrap items-center justify-between gap-3 px-4 py-3"
-                >
-                  <div className="min-w-0">
-                    <p className="text-sm font-semibold">
-                      {row.customer_name ?? 'Walk-in'} · {row.receipt_number}
-                    </p>
-                    <p className="text-xs text-muted">
-                      Due {row.due_date ?? '—'}
-                    </p>
-                  </div>
-                  <span className="font-mono text-sm font-bold">
-                    {formatMoney(row.balance)}
-                  </span>
-                </li>
-              ))}
-            </ul>
+            <>
+              {waNotice ? (
+                <p className="border-b border-line px-4 py-2 text-xs font-semibold text-muted">
+                  {waNotice}
+                </p>
+              ) : null}
+              <ul className="divide-y divide-line">
+                {summary!.debt_rows.map((row) => (
+                  <li
+                    key={row.sale_id || row.receipt_number}
+                    className="flex flex-wrap items-center justify-between gap-3 px-4 py-3"
+                  >
+                    <div className="min-w-0">
+                      <p className="text-sm font-semibold">
+                        {row.customer_name ?? 'Walk-in'} · {row.receipt_number}
+                      </p>
+                      <p className="text-xs text-muted">
+                        Due {row.due_date ?? '—'}
+                      </p>
+                    </div>
+                    <div className="flex shrink-0 items-center gap-2">
+                      <span className="font-mono text-sm font-bold">
+                        {formatMoney(row.balance)}
+                      </span>
+                      {row.customer_id && row.sale_id ? (
+                        <button
+                          type="button"
+                          title="Send WhatsApp reminder"
+                          disabled={arWaMutation.isPending}
+                          onClick={() => {
+                            setWaNotice(null)
+                            arWaMutation.mutate({
+                              customerId: row.customer_id!,
+                              saleId: row.sale_id,
+                            })
+                          }}
+                          className="inline-flex h-8 items-center gap-1 rounded-dentaflow border border-line px-2 text-[11px] font-bold disabled:opacity-60"
+                        >
+                          <MessageSquare className="h-3.5 w-3.5" />
+                          WhatsApp
+                        </button>
+                      ) : null}
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            </>
           )}
         </Panel>
       </div>

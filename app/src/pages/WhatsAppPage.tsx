@@ -1,6 +1,7 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState, type FormEvent } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { MessageSquare, X } from 'lucide-react'
+import { MessageSquare } from 'lucide-react'
+import { Drawer } from '../components/Drawer.tsx'
 import { useAuth } from '../lib/auth.tsx'
 import { cancelCampaign, fetchCampaigns } from '../lib/campaigns/api.ts'
 import {
@@ -18,12 +19,15 @@ import {
   renderTemplatePreview,
   simulateWhatsAppDelivery,
   simulateWhatsAppInbound,
+  updateMessageTemplate,
 } from '../lib/notifications/api.ts'
 import {
   KIND_LABELS,
   QUEUE_STATUS_LABELS,
+  TEMPLATE_STATUS_LABELS,
   type MessageTemplate,
   type QueueStatus,
+  type TemplateApprovalStatus,
 } from '../lib/notifications/types.ts'
 
 type Tab = 'templates' | 'campaigns' | 'queue' | 'log'
@@ -46,9 +50,26 @@ export function WhatsAppPage() {
   const { branchId, profile } = useAuth()
   const queryClient = useQueryClient()
   const [tab, setTab] = useState<Tab>('templates')
-  const [preview, setPreview] = useState<MessageTemplate | null>(null)
+  const [editing, setEditing] = useState<MessageTemplate | null>(null)
+  const [editName, setEditName] = useState('')
+  const [editBody, setEditBody] = useState('')
+  const [editMetaId, setEditMetaId] = useState('')
+  const [editStatus, setEditStatus] = useState<TemplateApprovalStatus>('draft')
   const [error, setError] = useState<string | null>(null)
   const [info, setInfo] = useState<string | null>(null)
+
+  const canEditTemplates =
+    profile?.role === 'owner' ||
+    profile?.role === 'branch_manager' ||
+    profile?.role === 'receptionist'
+
+  useEffect(() => {
+    if (!editing) return
+    setEditName(editing.name)
+    setEditBody(editing.body_text)
+    setEditMetaId(editing.whatsapp_template_id ?? '')
+    setEditStatus(editing.status)
+  }, [editing])
 
   const templatesQuery = useQuery({
     queryKey: ['message_templates'],
@@ -147,6 +168,27 @@ export function WhatsAppPage() {
     onError: (err: Error) => setError(err.message),
   })
 
+  const saveTemplateMutation = useMutation({
+    mutationFn: () => {
+      if (!editing) throw new Error('No template selected')
+      if (!editName.trim()) throw new Error('Name is required')
+      if (!editBody.trim()) throw new Error('Body text is required')
+      return updateMessageTemplate(editing.id, {
+        name: editName,
+        body_text: editBody,
+        whatsapp_template_id: editMetaId.trim() || null,
+        status: editStatus,
+      })
+    },
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ['message_templates'] })
+      setEditing(null)
+      setInfo('Template saved in DentaFlow. Submit matching text in Meta Business Manager for approval.')
+      setError(null)
+    },
+    onError: (err: Error) => setError(err.message),
+  })
+
   const templates = templatesQuery.data ?? []
   const kinds = useMemo(() => {
     const map = new Map<string, MessageTemplate[]>()
@@ -196,20 +238,25 @@ export function WhatsAppPage() {
         <div>
           <h1 className="text-3xl font-semibold">WhatsApp</h1>
           <p className="mt-1 text-sm text-muted">
-            Queue, Cloud API send (test number), and webhook delivery / reply 1·2 / opt-out. Swap
-            Edge secrets to the production number later — app code stays the same.
+            Queue and delivery / reply 1·2 / opt-out. Send provider is{' '}
+            <span className="font-semibold text-ink">Meta Cloud API</span>. Two numbers: existing
+            clinic WhatsApp for human chat; a second number for API notices only.
           </p>
         </div>
         <div className="flex max-w-md flex-col gap-2">
           <div className="rounded-dentaflow border border-line bg-canvas px-3 py-2 text-xs">
             <p className="flex items-center gap-2 font-semibold">
-              <span className="h-2 w-2 shrink-0 rounded-full bg-status-green" />
-              Send + webhook ready
+              <span className="h-2 w-2 shrink-0 rounded-full bg-status-amber" />
+              Meta Cloud API — set Edge secrets
             </p>
             <p className="mt-1 text-muted">
-              Add the recipient on Meta Step 1 (test allowlist). Secrets:
-              <span className="font-mono"> WHATSAPP_ACCESS_TOKEN </span>+
-              <span className="font-mono"> WHATSAPP_PHONE_NUMBER_ID</span>.
+              Keep the old chat number on the phone. Register a second number (not on WhatsApp app)
+              on a healthy M2B WABA in Meta Developers. Webhook:{' '}
+              <span className="font-mono">whatsapp-webhook</span>. Secrets:{' '}
+              <span className="font-mono">WHATSAPP_ACCESS_TOKEN</span>,{' '}
+              <span className="font-mono">WHATSAPP_PHONE_NUMBER_ID</span>,{' '}
+              <span className="font-mono">WHATSAPP_VERIFY_TOKEN</span>. Template field = Meta
+              template name when status is approved (<span className="font-mono">en_US</span>).
             </p>
           </div>
           {tab === 'queue' ? (
@@ -344,7 +391,7 @@ export function WhatsAppPage() {
                   <th className="px-4 py-3 font-semibold">Kind</th>
                   <th className="px-4 py-3 font-semibold">Category</th>
                   <th className="px-4 py-3 font-semibold">Meta status</th>
-                  <th className="px-4 py-3 text-end font-semibold">Preview</th>
+                  <th className="px-4 py-3 text-end font-semibold">Actions</th>
                 </tr>
               </thead>
               <tbody>
@@ -366,18 +413,25 @@ export function WhatsAppPage() {
                         >
                           {en?.status}
                         </span>
-                        {!en?.whatsapp_template_id ? (
-                          <p className="mt-1 text-[10px] text-muted">No Meta template id yet</p>
-                        ) : null}
+                        {en?.whatsapp_template_id ? (
+                          <p className="mt-1 font-mono text-[10px] text-muted">
+                            {en.whatsapp_template_id}
+                          </p>
+                        ) : (
+                          <p className="mt-1 text-[10px] text-muted">No Meta template name yet</p>
+                        )}
                       </td>
                       <td className="px-4 py-3 text-end">
                         {en ? (
                           <button
                             type="button"
-                            onClick={() => setPreview(en)}
+                            onClick={() => {
+                              setError(null)
+                              setEditing(en)
+                            }}
                             className="rounded-md border border-line px-2 py-1 text-[10px] font-bold"
                           >
-                            Preview
+                            {canEditTemplates ? 'Edit' : 'View'}
                           </button>
                         ) : (
                           <span className="text-xs text-muted">—</span>
@@ -441,7 +495,7 @@ export function WhatsAppPage() {
                               onClick={() => sendMutation.mutate({ queueId: item.id })}
                               className="text-xs font-semibold text-marine"
                             >
-                              Send via Meta
+                              Send via Cloud API
                             </button>
                             <button
                               type="button"
@@ -560,40 +614,122 @@ export function WhatsAppPage() {
         )
       ) : null}
 
-      {preview ? (
-        <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/40 p-4 sm:items-center">
-          <div className="w-full max-w-md rounded-dentaflow border border-line bg-surface p-4 shadow-lg">
-            <div className="mb-3 flex items-start justify-between gap-2">
-              <div>
-                <p className="flex items-center gap-2 text-sm font-bold">
-                  <MessageSquare className="h-4 w-4 text-flow-teal" />
-                  {preview.name}
-                </p>
-                <p className="text-[11px] text-muted">
-                  English · draft body (Meta id not set)
-                </p>
-              </div>
+      <Drawer
+        open={editing != null}
+        onClose={() => setEditing(null)}
+        title={canEditTemplates ? 'Edit WhatsApp template' : 'WhatsApp template'}
+        subtitle={
+          editing
+            ? `${KIND_LABELS[editing.kind] ?? editing.kind} · English · Meta en_US`
+            : undefined
+        }
+        footer={
+          <div className="flex justify-end gap-2">
+            <button
+              type="button"
+              onClick={() => setEditing(null)}
+              className="h-10 rounded-dentaflow border border-line px-4 text-sm font-semibold"
+            >
+              Close
+            </button>
+            {canEditTemplates ? (
               <button
-                type="button"
-                onClick={() => setPreview(null)}
-                className="inline-flex h-8 w-8 items-center justify-center rounded-md border border-line"
-                aria-label="Close"
+                type="submit"
+                form="wa-template-form"
+                disabled={saveTemplateMutation.isPending}
+                className="h-10 rounded-dentaflow bg-marine px-4 text-sm font-bold text-white disabled:opacity-60"
               >
-                <X className="h-4 w-4" />
+                {saveTemplateMutation.isPending ? 'Saving…' : 'Save'}
               </button>
-            </div>
-            <pre className="whitespace-pre-wrap rounded-dentaflow border border-line bg-canvas p-3 text-xs leading-relaxed text-main">
-              {renderTemplatePreview(preview.body_text, {
-                '1': 'Ayaan Abdi',
-                '2': 'N.I SMILE',
-                '3': '2026-10-15',
-                '4': '10:30',
-                '5': 'Demo Dentist',
-              })}
-            </pre>
+            ) : null}
           </div>
-        </div>
-      ) : null}
+        }
+      >
+        {editing ? (
+          <form
+            id="wa-template-form"
+            className="space-y-3"
+            onSubmit={(event: FormEvent) => {
+              event.preventDefault()
+              if (!canEditTemplates) return
+              setError(null)
+              saveTemplateMutation.mutate()
+            }}
+          >
+            <p className="rounded-[8px] bg-canvas p-3 text-[11px] text-muted">
+              Edit the DentaFlow draft here, then submit the same English text in Meta Business
+              Manager. After Meta approves, paste the template name below and set status to
+              Approved.
+            </p>
+            <label className="block text-sm font-semibold">
+              Display name
+              <input
+                value={editName}
+                onChange={(e) => setEditName(e.target.value)}
+                disabled={!canEditTemplates}
+                required
+                className="mt-1 h-10 w-full rounded-dentaflow border border-line bg-canvas px-3 font-normal disabled:opacity-70"
+              />
+            </label>
+            <label className="block text-sm font-semibold">
+              Body (use {'{{1}}'}, {'{{2}}'}, …)
+              <textarea
+                value={editBody}
+                onChange={(e) => setEditBody(e.target.value)}
+                disabled={!canEditTemplates}
+                required
+                rows={8}
+                className="mt-1 w-full rounded-dentaflow border border-line bg-canvas px-3 py-2 font-mono text-xs leading-relaxed font-normal disabled:opacity-70"
+              />
+            </label>
+            {editing.variables.length > 0 ? (
+              <p className="font-mono text-[10px] text-muted">
+                Variables: {editing.variables.join(', ')}
+              </p>
+            ) : null}
+            <label className="block text-sm font-semibold">
+              Meta template name
+              <input
+                value={editMetaId}
+                onChange={(e) => setEditMetaId(e.target.value)}
+                disabled={!canEditTemplates}
+                placeholder="e.g. appointment_confirmation"
+                className="mt-1 h-10 w-full rounded-dentaflow border border-line bg-canvas px-3 font-mono font-normal disabled:opacity-70"
+              />
+            </label>
+            <label className="block text-sm font-semibold">
+              Status
+              <select
+                value={editStatus}
+                onChange={(e) => setEditStatus(e.target.value as TemplateApprovalStatus)}
+                disabled={!canEditTemplates}
+                className="mt-1 h-10 w-full rounded-dentaflow border border-line bg-canvas px-3 font-normal disabled:opacity-70"
+              >
+                {(Object.keys(TEMPLATE_STATUS_LABELS) as TemplateApprovalStatus[]).map((s) => (
+                  <option key={s} value={s}>
+                    {TEMPLATE_STATUS_LABELS[s]}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <div>
+              <p className="mb-1 flex items-center gap-1.5 text-xs font-bold">
+                <MessageSquare className="h-3.5 w-3.5 text-flow-teal" />
+                Preview
+              </p>
+              <pre className="whitespace-pre-wrap rounded-dentaflow border border-line bg-canvas p-3 text-xs leading-relaxed">
+                {renderTemplatePreview(editBody, {
+                  '1': 'Ayaan Abdi',
+                  '2': 'N.I SMILE',
+                  '3': '2026-10-15',
+                  '4': '10:30',
+                  '5': 'Demo Dentist',
+                })}
+              </pre>
+            </div>
+          </form>
+        ) : null}
+      </Drawer>
     </section>
   )
 }

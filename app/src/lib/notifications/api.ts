@@ -1,4 +1,5 @@
 import { supabase } from '../supabase.ts'
+import { appendCareFooter } from '../whatsappCare.ts'
 import type {
   MessageTemplate,
   NotificationLogItem,
@@ -15,6 +16,7 @@ export type SendWhatsAppResult = {
     provider_message_id?: string
     mode?: string
     error?: string
+    pdf?: { ok: boolean; filename?: string; error?: string } | null
   }>
   error?: string
 }
@@ -37,6 +39,28 @@ export async function fetchMessageTemplates(): Promise<MessageTemplate[]> {
     ...row,
     variables: asStringArray(row.variables),
   })) as MessageTemplate[]
+}
+
+export async function updateMessageTemplate(
+  id: string,
+  input: {
+    name: string
+    body_text: string
+    whatsapp_template_id: string | null
+    status: MessageTemplate['status']
+  },
+): Promise<void> {
+  const { error } = await supabase
+    .from('message_templates')
+    .update({
+      name: input.name.trim(),
+      body_text: input.body_text,
+      whatsapp_template_id: input.whatsapp_template_id?.trim() || null,
+      status: input.status,
+      updated_at: new Date().toISOString(),
+    })
+    .eq('id', id)
+  if (error) throw error
 }
 
 export async function fetchNotificationQueue(
@@ -157,7 +181,7 @@ export async function simulateWhatsAppInbound(
   return (data ?? {}) as { action?: string; appointment_id?: string | null }
 }
 
-/** Invoke Edge Function send-whatsapp (Meta Cloud API via test or production number). */
+/** Invoke Edge Function send-whatsapp (Meta Cloud API). */
 export async function processWhatsAppQueue(input?: {
   limit?: number
   queueId?: string
@@ -176,15 +200,42 @@ export async function processWhatsAppQueue(input?: {
   return result
 }
 
-/** Replace {{1}} … placeholders for preview. */
+export type SendWhatsAppNowResult = {
+  skipped: boolean
+  reason?: string
+  queueId?: string
+  send?: SendWhatsAppResult
+}
+
+/**
+ * Enqueue then process immediately (one-click send).
+ * `enqueue` should return a queue row id, or null when nothing was queued.
+ */
+export async function sendWhatsAppNow(
+  enqueue: () => Promise<string | null>,
+): Promise<SendWhatsAppNowResult> {
+  const queueId = await enqueue()
+  if (!queueId) {
+    return {
+      skipped: true,
+      reason:
+        'Nothing queued — walk-in, opted out, missing phone, or this sale was already sent.',
+    }
+  }
+  const send = await processWhatsAppQueue({ limit: 1, queueId })
+  return { skipped: false, queueId, send }
+}
+
+/** Replace {{1}} … placeholders for preview (includes Customer Care footer). */
 export function renderTemplatePreview(
   body: string,
   params: Record<string, unknown>,
 ): string {
-  return body.replace(/\{\{(\d+)\}\}/g, (_, num: string) => {
+  const rendered = body.replace(/\{\{(\d+)\}\}/g, (_, num: string) => {
     const key = num
     const named = params[key]
     if (named != null) return String(named)
     return `{{${num}}}`
   })
+  return appendCareFooter(rendered)
 }

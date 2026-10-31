@@ -190,6 +190,24 @@ export async function linkAppointmentSale(
   if (error) throw error
 }
 
+export type AppointmentWhatsAppKind =
+  | 'appointment_confirmation'
+  | 'appointment_reminder_24h'
+  | 'appointment_reminder_2h'
+
+/** Enqueue (or reuse pending) appointment WhatsApp; returns queue id for send-now. */
+export async function notifyAppointmentWhatsApp(
+  appointmentId: string,
+  kind: AppointmentWhatsAppKind = 'appointment_confirmation',
+): Promise<string | null> {
+  const { data, error } = await supabase.rpc('notify_appointment_whatsapp', {
+    p_appointment_id: appointmentId,
+    p_kind: kind,
+  })
+  if (error) throw error
+  return (data as string | null) ?? null
+}
+
 export function startOfWeek(date: Date): Date {
   const d = new Date(date)
   d.setHours(0, 0, 0, 0)

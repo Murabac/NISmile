@@ -15,6 +15,7 @@ import {
   type ThermalWidth,
 } from '../lib/clinic.ts'
 import { formatMoney } from '../lib/money.ts'
+import { sendWhatsAppNow } from '../lib/notifications/api.ts'
 import { notifySaleDocument } from '../lib/sales/api.ts'
 import type { Sale } from '../lib/sales/types.ts'
 import { TENDER_LABELS } from '../lib/sales/types.ts'
@@ -37,12 +38,30 @@ export function SaleDocumentsModal({
   const [notice, setNotice] = useState<string | null>(null)
 
   const notifyMutation = useMutation({
-    mutationFn: () => notifySaleDocument(sale.id),
-    onSuccess: (id) => {
+    mutationFn: () =>
+      sendWhatsAppNow(() => notifySaleDocument(sale.id)),
+    onSuccess: (result) => {
+      if (result.skipped) {
+        setNotice(result.reason ?? 'Nothing queued.')
+        return
+      }
+      const row = result.send?.results?.[0]
+      if (row && !row.ok) {
+        setNotice(`WhatsApp send failed: ${row.error ?? 'unknown error'}`)
+        return
+      }
+      const pdf = (row as { pdf?: { ok?: boolean; error?: string } } | undefined)
+        ?.pdf
+      if (pdf && pdf.ok === false) {
+        setNotice(
+          `WhatsApp notice sent; PDF failed: ${pdf.error ?? 'unknown error'}`,
+        )
+        return
+      }
       setNotice(
-        id
-          ? 'WhatsApp notice queued (English). PDF stays English when attached later.'
-          : 'No notice queued — customer may be walk-in, opted out, or already notified.',
+        pdf?.ok
+          ? 'WhatsApp notice + PDF receipt sent via Cloud API (English).'
+          : 'WhatsApp notice sent via Cloud API (English).',
       )
     },
     onError: (err: Error) => setNotice(err.message),
@@ -112,7 +131,7 @@ export function SaleDocumentsModal({
                 className="inline-flex h-9 items-center gap-2 rounded-dentaflow border border-line px-3 text-xs font-semibold disabled:opacity-60"
               >
                 <MessageSquare className="h-3.5 w-3.5" />
-                Queue WhatsApp notice
+                {notifyMutation.isPending ? 'Sending…' : 'Send WhatsApp'}
               </button>
             ) : null}
             <button
