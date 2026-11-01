@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { useMutation } from '@tanstack/react-query'
+import { useMutation, useQuery } from '@tanstack/react-query'
 import { MessageSquare, Printer, X } from 'lucide-react'
 import {
   CLINIC_ADDRESS,
@@ -14,7 +14,10 @@ import {
   invoiceNumberFromReceipt,
   type ThermalWidth,
 } from '../lib/clinic.ts'
-import { formatMoney } from '../lib/money.ts'
+import { supabase } from '../lib/supabase.ts'
+import type { BranchRegion } from '../lib/branches/types.ts'
+import { fetchClinicSettings } from '../lib/loyalty/api.ts'
+import { formatMoney, formatMoneyForRegion } from '../lib/money.ts'
 import { sendWhatsAppNow } from '../lib/notifications/api.ts'
 import { notifySaleDocument } from '../lib/sales/api.ts'
 import type { Sale } from '../lib/sales/types.ts'
@@ -36,6 +39,39 @@ export function SaleDocumentsModal({
   const [mode, setMode] = useState<DocMode>(defaultMode)
   const [width, setWidth] = useState<ThermalWidth>(80)
   const [notice, setNotice] = useState<string | null>(null)
+
+  const settingsQuery = useQuery({
+    queryKey: ['clinic_settings'],
+    queryFn: fetchClinicSettings,
+  })
+  const branchQuery = useQuery({
+    queryKey: ['branch_region', sale.branch_id],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('branches')
+        .select('region')
+        .eq('id', sale.branch_id)
+        .maybeSingle()
+      if (error) throw error
+      const region = data?.region === 'ethiopia' ? 'ethiopia' : 'somaliland'
+      return region as BranchRegion
+    },
+  })
+  const region = branchQuery.data ?? 'somaliland'
+  const rates = settingsQuery.data
+  const totalFx = formatMoneyForRegion(sale.total, region, rates)
+  const paidFx = formatMoneyForRegion(sale.paid_total, region, rates)
+  const balance = sale.total - sale.paid_total
+  const balanceFx =
+    balance > 0.009 ? formatMoneyForRegion(balance, region, rates) : null
+  const amountsNote =
+    region === 'ethiopia'
+      ? rates?.fx_etb_per_usd
+        ? 'Amounts in USD with ETB equivalent at clinic rate.'
+        : 'Amounts in USD.'
+      : rates?.fx_slsh_per_usd
+        ? 'Amounts in USD with SLSH equivalent at clinic rate.'
+        : 'Amounts in USD.'
 
   const notifyMutation = useMutation({
     mutationFn: () =>
@@ -164,9 +200,24 @@ export function SaleDocumentsModal({
           }
         >
           {mode === 'receipt' ? (
-            <ThermalReceipt sale={sale} customerName={customerName} width={width} />
+            <ThermalReceipt
+              sale={sale}
+              customerName={customerName}
+              width={width}
+              totalFx={totalFx}
+              paidFx={paidFx}
+              balanceFx={balanceFx}
+              amountsNote={amountsNote}
+            />
           ) : (
-            <A4Invoice sale={sale} customerName={customerName} />
+            <A4Invoice
+              sale={sale}
+              customerName={customerName}
+              totalFx={totalFx}
+              paidFx={paidFx}
+              balanceFx={balanceFx}
+              amountsNote={amountsNote}
+            />
           )}
         </div>
       </div>
@@ -178,10 +229,18 @@ function ThermalReceipt({
   sale,
   customerName,
   width,
+  totalFx,
+  paidFx,
+  balanceFx,
+  amountsNote,
 }: {
   sale: Sale
   customerName: string
   width: ThermalWidth
+  totalFx: string
+  paidFx: string
+  balanceFx: string | null
+  amountsNote: string
 }) {
   const paymentSummary =
     sale.payments.length === 0
@@ -248,18 +307,17 @@ function ThermalReceipt({
         <Row label="VAT" value={formatMoney(sale.tax_total)} />
         <div className="flex justify-between border-t border-neutral-300 pt-2 text-sm font-bold text-[#0C3B4A]">
           <span>TOTAL</span>
-          <span className="tabular-nums">{formatMoney(sale.total)}</span>
+          <span className="max-w-[70%] text-end tabular-nums">{totalFx}</span>
         </div>
-        <Row label="Paid" value={formatMoney(sale.paid_total)} />
-        {sale.total - sale.paid_total > 0.009 ? (
-          <Row label="Balance due" value={formatMoney(sale.total - sale.paid_total)} />
-        ) : null}
+        <Row label="Paid" value={paidFx} />
+        {balanceFx ? <Row label="Balance due" value={balanceFx} /> : null}
       </div>
 
       <div className="space-y-1 pt-3 text-center text-[10px] text-neutral-600">
         <p>Zaad: {CLINIC_ZAAD}</p>
         <p>eDahab: {CLINIC_EDAHAB}</p>
         <p>MyCash (Amal Bank): {CLINIC_MYCASH}</p>
+        <p className="pt-2 text-[9px] text-neutral-500">{amountsNote}</p>
         <p className="pt-2 text-neutral-500">Thank you for trusting {CLINIC_LEGAL_NAME}.</p>
         <p className="pt-1 text-[9px] text-neutral-400">{sale.receipt_number}</p>
       </div>
@@ -267,7 +325,21 @@ function ThermalReceipt({
   )
 }
 
-function A4Invoice({ sale, customerName }: { sale: Sale; customerName: string }) {
+function A4Invoice({
+  sale,
+  customerName,
+  totalFx,
+  paidFx,
+  balanceFx,
+  amountsNote,
+}: {
+  sale: Sale
+  customerName: string
+  totalFx: string
+  paidFx: string
+  balanceFx: string | null
+  amountsNote: string
+}) {
   const inv = invoiceNumberFromReceipt(sale.receipt_number)
   return (
     <div className="mx-auto max-w-[210mm] space-y-6 border border-[#DDE7E5] bg-white p-8 text-sm shadow-sm">
@@ -312,7 +384,7 @@ function A4Invoice({ sale, customerName }: { sale: Sale; customerName: string })
           <p className="font-bold text-[#0C3B4A]">Payment status</p>
           <p className="mt-1 font-semibold capitalize">{sale.status}</p>
           <p className="text-[#536E75]">
-            Paid {formatMoney(sale.paid_total)} of {formatMoney(sale.total)}
+            Paid {paidFx} of {totalFx}
           </p>
         </div>
       </div>
@@ -351,10 +423,16 @@ function A4Invoice({ sale, customerName }: { sale: Sale; customerName: string })
           <span className="text-[#536E75]">VAT</span>
           <span className="font-mono font-bold">{formatMoney(sale.tax_total)}</span>
         </div>
-        <div className="flex justify-between border-t border-[#DDE7E5] pt-2 text-sm font-bold text-[#0C3B4A]">
+        <div className="flex justify-between gap-2 border-t border-[#DDE7E5] pt-2 text-sm font-bold text-[#0C3B4A]">
           <span>Total</span>
-          <span className="font-mono">{formatMoney(sale.total)}</span>
+          <span className="text-end font-mono">{totalFx}</span>
         </div>
+        {balanceFx ? (
+          <div className="flex justify-between gap-2 text-xs font-semibold text-[#0C3B4A]">
+            <span>Balance due</span>
+            <span className="text-end font-mono">{balanceFx}</span>
+          </div>
+        ) : null}
         {sale.payments.length > 0 ? (
           <div className="space-y-1 border-t border-[#EEF4F3] pt-2">
             {sale.payments.map((pay) => (
@@ -375,7 +453,7 @@ function A4Invoice({ sale, customerName }: { sale: Sale; customerName: string })
           Payment accounts — Zaad: {CLINIC_ZAAD} · eDahab: {CLINIC_EDAHAB} · MyCash (Amal Bank):{' '}
           {CLINIC_MYCASH}
         </p>
-        <p className="mt-2">Prices exclude VAT unless noted. Amounts in USD.</p>
+        <p className="mt-2">Prices exclude VAT unless noted. {amountsNote}</p>
       </div>
     </div>
   )

@@ -19,6 +19,9 @@ export async function fetchClinicSettings(): Promise<ClinicSettings | null> {
       row.loyalty_usd_per_point == null ? null : Number(row.loyalty_usd_per_point),
     loyalty_min_redeem_points:
       row.loyalty_min_redeem_points == null ? null : Number(row.loyalty_min_redeem_points),
+    fx_slsh_per_usd: row.fx_slsh_per_usd == null ? null : Number(row.fx_slsh_per_usd),
+    fx_etb_per_usd: row.fx_etb_per_usd == null ? null : Number(row.fx_etb_per_usd),
+    fx_rates_updated_at: row.fx_rates_updated_at ?? null,
   }
 }
 
@@ -36,9 +39,25 @@ export async function updateClinicSettings(
     p_clear_loyalty_redeem: input.clear_loyalty_redeem ?? false,
     p_clear_loyalty_min: input.clear_loyalty_min ?? false,
     p_clear_loyalty_expire: input.clear_loyalty_expire ?? false,
+    p_fx_slsh_per_usd: input.fx_slsh_per_usd ?? null,
+    p_fx_etb_per_usd: input.fx_etb_per_usd ?? null,
+    p_clear_fx_slsh: input.clear_fx_slsh ?? false,
+    p_clear_fx_etb: input.clear_fx_etb ?? false,
   })
   if (error) throw error
-  return data as ClinicSettings
+  const row = data as ClinicSettings
+  return {
+    ...row,
+    vat_percent: row.vat_percent == null ? null : Number(row.vat_percent),
+    loyalty_earn_per_usd: row.loyalty_earn_per_usd == null ? null : Number(row.loyalty_earn_per_usd),
+    loyalty_usd_per_point:
+      row.loyalty_usd_per_point == null ? null : Number(row.loyalty_usd_per_point),
+    loyalty_min_redeem_points:
+      row.loyalty_min_redeem_points == null ? null : Number(row.loyalty_min_redeem_points),
+    fx_slsh_per_usd: row.fx_slsh_per_usd == null ? null : Number(row.fx_slsh_per_usd),
+    fx_etb_per_usd: row.fx_etb_per_usd == null ? null : Number(row.fx_etb_per_usd),
+    fx_rates_updated_at: row.fx_rates_updated_at ?? null,
+  }
 }
 
 export async function fetchLoyaltyTransactions(customerId: string): Promise<LoyaltyTransaction[]> {

@@ -31,6 +31,9 @@ export type SalePdfInput = {
   due_date: string | null
   created_at: string
   customer_name: string
+  /** Dual-currency total line when FX rate is set for branch region */
+  total_fx_label: string | null
+  amounts_note: string
   lines: Array<{
     sku_or_code: string
     name: string
@@ -318,7 +321,8 @@ export async function buildSalePdf(
     totals.push(['Discount', `-${money(sale.discount_total)}`, false])
   }
   totals.push(['VAT', money(sale.tax_total), false])
-  totals.push(['Total', money(sale.total), true])
+  const totalLabel = sale.total_fx_label ?? money(sale.total)
+  totals.push(['Total', totalLabel, true])
   totals.push(['Paid', money(sale.paid_total), false])
   const balance = sale.total - sale.paid_total
   if (balance > 0.009) {
@@ -327,11 +331,12 @@ export async function buildSalePdf(
 
   for (const [label, value, bold] of totals) {
     const f = bold ? fontBold : font
+    const size = value.length > 18 ? 7 : 9
     page.drawText(label, { x: 340, y, size: 9, font: f, color: muted })
     page.drawText(value, {
-      x: right - f.widthOfTextAtSize(value, 9),
+      x: right - f.widthOfTextAtSize(value, size),
       y,
-      size: 9,
+      size,
       font: f,
       color: ink,
     })
@@ -382,13 +387,16 @@ export async function buildSalePdf(
     `Payment accounts — Zaad: ${CLINIC_ZAAD} · eDahab: ${CLINIC_EDAHAB} · MyCash (Amal Bank): ${CLINIC_MYCASH}`,
     { x: left, y: 58, size: 8, font, color: muted },
   )
-  page.drawText('Prices exclude VAT unless noted. Amounts in USD.', {
-    x: left,
-    y: 44,
-    size: 8,
-    font,
-    color: muted,
-  })
+  page.drawText(
+    `Prices exclude VAT unless noted. ${sale.amounts_note}`,
+    {
+      x: left,
+      y: 44,
+      size: 8,
+      font,
+      color: muted,
+    },
+  )
 
   return doc.save()
 }
@@ -402,7 +410,7 @@ export async function loadSalePdfInput(
   const { data: sale, error } = await dental
     .from('sales')
     .select(
-      'id, receipt_number, price_list, status, subtotal, discount_total, tax_total, total, paid_total, due_date, created_at, customer_id',
+      'id, branch_id, receipt_number, price_list, status, subtotal, discount_total, tax_total, total, paid_total, due_date, created_at, customer_id',
     )
     .eq('id', saleId)
     .maybeSingle()
@@ -417,6 +425,38 @@ export async function loadSalePdfInput(
       .eq('id', sale.customer_id)
       .maybeSingle()
     if (cust?.name) customerName = String(cust.name)
+  }
+
+  let region: 'somaliland' | 'ethiopia' = 'somaliland'
+  if (sale.branch_id) {
+    const { data: branch } = await dental
+      .from('branches')
+      .select('region')
+      .eq('id', sale.branch_id)
+      .maybeSingle()
+    if (branch?.region === 'ethiopia') region = 'ethiopia'
+  }
+
+  const { data: settings } = await dental
+    .from('clinic_settings')
+    .select('fx_slsh_per_usd, fx_etb_per_usd')
+    .order('created_at', { ascending: true })
+    .limit(1)
+    .maybeSingle()
+
+  const slsh =
+    settings?.fx_slsh_per_usd != null ? Number(settings.fx_slsh_per_usd) : null
+  const etb =
+    settings?.fx_etb_per_usd != null ? Number(settings.fx_etb_per_usd) : null
+  const totalUsd = Number(sale.total)
+  let totalFxLabel: string | null = null
+  let amountsNote = 'Amounts in USD.'
+  if (region === 'ethiopia' && etb != null && etb > 0) {
+    totalFxLabel = `${money(totalUsd)} · ${(totalUsd * etb).toFixed(2)} ETB`
+    amountsNote = 'Amounts in USD with ETB equivalent at clinic rate.'
+  } else if (region === 'somaliland' && slsh != null && slsh > 0) {
+    totalFxLabel = `${money(totalUsd)} · ${Math.round(totalUsd * slsh).toLocaleString('en-US')} SLSH`
+    amountsNote = 'Amounts in USD with SLSH equivalent at clinic rate.'
   }
 
   const { data: lines, error: lineErr } = await dental
@@ -445,6 +485,8 @@ export async function loadSalePdfInput(
     due_date: sale.due_date ? String(sale.due_date) : null,
     created_at: String(sale.created_at),
     customer_name: customerName,
+    total_fx_label: totalFxLabel,
+    amounts_note: amountsNote,
     lines: (lines ?? []).map(
       (l: {
         sku_or_code: string

@@ -5,8 +5,8 @@ import { Modal } from '../components/Modal.tsx'
 import { useAuth } from '../lib/auth.tsx'
 import { fetchItems, fetchServices } from '../lib/catalog/api.ts'
 import {
-  enqueuePromotionCampaign,
   listPromotionAudience,
+  sendPromotionCampaignNow,
 } from '../lib/campaigns/api.ts'
 import type { AudienceMember, CampaignKind } from '../lib/campaigns/types.ts'
 import { fetchClinicSettings, updateClinicSettings } from '../lib/loyalty/api.ts'
@@ -128,13 +128,32 @@ export function PromotionsPage() {
     onError: (err: Error) => setError(err.message),
   })
 
-  const enqueueMutation = useMutation({
-    mutationFn: ({ id, kind }: { id: string; kind: CampaignKind }) =>
-      enqueuePromotionCampaign({ promotionId: id, kind }),
-    onSuccess: async (campaignId) => {
+  const sendCampaignMutation = useMutation({
+    mutationFn: ({
+      id,
+      kind,
+      expectedCount,
+    }: {
+      id: string
+      kind: CampaignKind
+      expectedCount: number
+    }) =>
+      sendPromotionCampaignNow({
+        promotionId: id,
+        kind,
+        expectedCount,
+      }),
+    onSuccess: async (result) => {
       await queryClient.invalidateQueries({ queryKey: ['campaigns'] })
       await queryClient.invalidateQueries({ queryKey: ['notification_queue'] })
-      setInfo(`Campaign queued (${campaignId.slice(0, 8)}…). Process due on WhatsApp to send.`)
+      await queryClient.invalidateQueries({ queryKey: ['notification_log'] })
+      const parts = [
+        `Campaign ${result.campaignId.slice(0, 8)}…`,
+        `${result.okCount} sent`,
+        result.failCount ? `${result.failCount} failed` : null,
+        result.processed === 0 ? 'nothing processed (check Edge secrets / templates)' : null,
+      ].filter(Boolean)
+      setInfo(parts.join(' · '))
       setError(null)
       setAudiencePromoId(null)
     },
@@ -362,7 +381,7 @@ export function PromotionsPage() {
                         className="rounded-md border border-line px-2.5 py-1 text-[10px] font-bold text-flow-teal"
                         onClick={() => openAudience(promo.id)}
                       >
-                        Preview & enqueue
+                        Send WhatsApp
                       </button>
                     ) : null}
                     {promo.status !== 'ended' ? (
@@ -387,8 +406,8 @@ export function PromotionsPage() {
       <Modal
         open={audiencePromoId != null}
         onClose={() => setAudiencePromoId(null)}
-        title="Campaign audience preview"
-        subtitle="Opt-in customers with a phone · English WhatsApp templates"
+        title="Send WhatsApp campaign"
+        subtitle="Opt-in customers with a phone · queues then sends immediately (English templates)"
         maxWidth="lg"
         footer={
           <div className="flex w-full flex-wrap items-center justify-between gap-3">
@@ -413,15 +432,21 @@ export function PromotionsPage() {
                 disabled={
                   !audiencePromoId ||
                   recipients.length === 0 ||
-                  enqueueMutation.isPending
+                  sendCampaignMutation.isPending
                 }
                 onClick={() =>
                   audiencePromoId &&
-                  enqueueMutation.mutate({ id: audiencePromoId, kind: enqueueKind })
+                  sendCampaignMutation.mutate({
+                    id: audiencePromoId,
+                    kind: enqueueKind,
+                    expectedCount: recipients.length,
+                  })
                 }
                 className="rounded-[8px] bg-[#FF6B57] px-4 py-2 text-xs font-bold text-white disabled:opacity-60"
               >
-                {enqueueMutation.isPending ? 'Enqueueing…' : `Enqueue ${recipients.length}`}
+                {sendCampaignMutation.isPending
+                  ? 'Sending…'
+                  : `Send WhatsApp (${recipients.length})`}
               </button>
             </div>
           </div>
@@ -783,7 +808,7 @@ export function PromotionsPage() {
               <div>
                 <span className="font-bold">Notify eligible customers on WhatsApp</span>
                 <p className="text-[11px] text-muted">
-                  English announcement text only. Campaign enqueue uses Meta English templates.
+                  English announcement text only. Use Send WhatsApp on the card to blast opted-in customers.
                 </p>
               </div>
               <input

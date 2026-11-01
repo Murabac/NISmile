@@ -192,8 +192,14 @@ export async function processWhatsAppQueue(input?: {
       queue_id: input?.queueId ?? null,
     },
   })
-  if (error) throw error
   const result = (data ?? {}) as SendWhatsAppResult
+  if (error) {
+    const detail =
+      typeof result.error === 'string' && result.error
+        ? result.error
+        : error.message
+    throw new Error(detail || 'send-whatsapp Edge Function failed')
+  }
   if (result.error && !result.ok) {
     throw new Error(result.error)
   }

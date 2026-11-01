@@ -1,3 +1,4 @@
+import { processWhatsAppQueue, type SendWhatsAppResult } from '../notifications/api.ts'
 import { supabase } from '../supabase.ts'
 import type {
   AudienceMember,
@@ -69,6 +70,63 @@ export async function enqueuePromotionCampaign(input: {
   })
   if (error) throw error
   return data as string
+}
+
+export type SendPromotionCampaignResult = {
+  campaignId: string
+  processed: number
+  okCount: number
+  failCount: number
+  batches: SendWhatsAppResult[]
+}
+
+/**
+ * Enqueue a promotion audience blast, then process the WhatsApp queue
+ * immediately (no trip to WhatsApp → Process due).
+ */
+export async function sendPromotionCampaignNow(input: {
+  promotionId: string
+  kind?: CampaignKind
+  name?: string | null
+  /** Audience size — used to size Process due batches */
+  expectedCount?: number
+}): Promise<SendPromotionCampaignResult> {
+  const campaignId = await enqueuePromotionCampaign({
+    promotionId: input.promotionId,
+    kind: input.kind,
+    name: input.name,
+  })
+
+  const target = Math.max(1, Math.min(input.expectedCount ?? 20, 200))
+  const batchSize = 20
+  const maxRounds = Math.ceil(target / batchSize) + 2
+  const batches: SendWhatsAppResult[] = []
+  let processed = 0
+  let okCount = 0
+  let failCount = 0
+
+  for (let round = 0; round < maxRounds; round++) {
+    const remaining = target - processed
+    if (remaining <= 0) break
+    const send = await processWhatsAppQueue({
+      limit: Math.min(batchSize, remaining),
+    })
+    batches.push(send)
+    if (!send.processed) break
+    processed += send.processed
+    for (const row of send.results) {
+      if (row.ok) okCount += 1
+      else failCount += 1
+    }
+  }
+
+  if (processed === 0) {
+    throw new Error(
+      'Campaign queued but nothing was sent. Open WhatsApp → Process due, or check Edge secrets (WHATSAPP_ACCESS_TOKEN, WHATSAPP_PHONE_NUMBER_ID) and Meta test allowlist for the recipient phone.',
+    )
+  }
+
+  return { campaignId, processed, okCount, failCount, batches }
 }
 
 export async function cancelCampaign(campaignId: string): Promise<void> {

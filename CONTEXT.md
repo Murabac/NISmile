@@ -2,7 +2,7 @@
 
 This file is the map for building DentaFlow. The product spec is `DentaFlow-Project-Plan-v2.md`. The look and screen behavior come from `Design Ref/`. Logos live in `Brand/`.
 
-**Current step:** **35 — Promotions Send WhatsApp.** Step 34 appointment one-click WhatsApp done. Meta test-number send works; production API number still human (step 37). Coolify Docker for the staff UI is in-repo (`Dockerfile`, `app/nginx.conf`): Base Directory empty / `.`, port 80, build-args `VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY`; add the Coolify domain to Supabase Auth → URL configuration if not done. Do not invent the VAT percentage, loyalty rates, a MyCash account number, or WhatsApp tokens.
+**Current step:** Apply migration `20261017150000_dental_branch_region_fx.sql`, then set FX rates in Settings and redeploy `send-whatsapp` if using sale PDFs. Step **38** branch regions + SLSH/ETB display done in code. WhatsApp **36/37** still open (Meta token / production number). Do not invent VAT, loyalty, FX rates, MyCash, or WhatsApp tokens.
 
 ## What this repo is
 
@@ -21,10 +21,10 @@ DentaFlow is a multi-branch dental clinic system: inventory, retail and wholesal
 ## Locked decisions
 
 - **Name:** DentaFlow is the staff app. The clinic is N.I SMILE. GitHub remote: https://github.com/Murabac/NISmile.git on `main`. Do not commit `app/.env.local`.
-- **Currency:** USD only. Store money as `numeric(12,2)`. No exchange rates.
+- **Currency:** **USD is the ledger** (prices, stock, sales, AR, reports, loyalty). Store money as `numeric(12,2)`. Owner sets **manual** FX in Settings → Exchange rates: `fx_slsh_per_usd` and `fx_etb_per_usd` (units per 1 USD). Blank until filled — do not invent rates.
 - **Staff app language:** English only. No language switcher, no translated screens, no RTL layout. Section 3.8 of the plan and the prototype's language switcher are superseded.
 - **WhatsApp languages:** message content is **English only**. Meta Cloud API templates use **`en_US`**. `customers.language` is forced to `en` (so/ar enum values unused). No customer language picker. Staff UI stays English-only (no screen translation / no RTL switcher).
-- **Branches:** Schema supports many branches. Owner manages them in **Settings → Branches** (create, edit, deactivate, delete). **Seed one branch** for go-live. Owners can view all branches once more exist. Everyone else is limited to their branches.
+- **Branches:** Schema supports many branches. Owner manages them in **Settings → Branches** (create, edit, deactivate, delete). Each branch has a **region**: `somaliland` | `ethiopia`. **Somaliland** customer docs / POS dual line = **USD + SLSH**; **Ethiopia** = **USD + ETB** (when that rate is set). Seed / default region `somaliland`. Owners can view all branches once more exist. Everyone else is limited to their branches.
 - **Shared across branches:** items, services, price lists, tax rates.
 - **Per branch:** customers (patients and wholesale), stock, sales, appointments, purchases, expenses, cash. A customer record belongs to one branch.
 - **Expenses:** branch operating costs (rent, utilities, salaries, etc.) paid with Cash / Zaad / eDahab / MyCash. Posted or void. Categories are shared. Owner / branch manager / receptionist can record.
@@ -187,10 +187,10 @@ Work in order. Finish a step before starting the next one inside the same phase.
 
 33. **AR payment reminder.** Done. Template `payment_due_reminder` (English). RPC `notify_ar_payment_reminder(customer_id, sale_id?)` — account or invoice balance + due date; reuses pending; skips same-day sent. Customers **Send WhatsApp reminder**; Dashboard open-receivables **WhatsApp** per row. Migration `20261017100000_ar_payment_reminder.sql`.
 34. **Appointment WhatsApp buttons.** Done. RPC `notify_appointment_whatsapp(appointment_id, kind)` for confirmation / 24h reminder / 2h reminder (reuse pending, send now). Appointments drawer: **Send confirmation** + **Send reminder**. Cancel RPC returns queue id. Migration `20261017110000_appointment_whatsapp_send.sql`.
-35. **Promotions Send WhatsApp.** Not started.
+35. **Promotions Send WhatsApp.** Done. Promo card **Send WhatsApp** → audience modal → `sendPromotionCampaignNow` (`enqueue_promotion_campaign` then `processWhatsAppQueue` in batches). Labels: announcement / ending soon. No per-customer promo path.
 36. **Docs + end-to-end test.** Not started (after Meta secrets + healthy WABA).
 
-37. **Meta Cloud API production (human) — current.**
+37. **Meta Cloud API production (human).**
 1. Wait for **M2B TECHNOLOGY (IT SOLUTIONS)** Meta business verification = Verified.
 2. Healthy WABA under M2B (do not reuse a disabled WABA).
 3. Register **second** phone number on Cloud API (not the human-chat SIM).
@@ -200,12 +200,15 @@ Work in order. Finish a step before starting the next one inside the same phase.
 7. English Meta templates → paste names into DentaFlow as approved.
 8. Test Send WhatsApp / Process due.
 
+38. **Branch regions + manual FX.** Done in app. Migration `20261017150000_dental_branch_region_fx.sql`: `branches.region`, `clinic_settings.fx_slsh_per_usd` / `fx_etb_per_usd`. Settings → Branches (region) + Exchange rates. POS dual total + foreign→Cash convert; receipts/invoices/statements/PDF show USD+SLSH or USD+ETB by branch region. Apply migration on remote; redeploy `send-whatsapp` for PDF FX line.
+
 ## Decisions locked on 2026-10-13
 
 | Topic | Decision |
 |---|---|
 | Supabase | Existing project `iwnswhnoxbvgyqljfvel`. Schema name `dental`. Keys live only in `app/.env.local`. |
-| Branches | One branch at launch. Schema and Settings still allow more. |
+| Branches | One branch at launch. Region somaliland \| ethiopia. Schema and Settings still allow more. |
+| Currency | USD ledger. Manual SLSH/ETB rates in Settings. Docs: Somaliland USD+SLSH; Ethiopia USD+ETB. |
 | Customers | Each customer belongs to one branch. |
 | VAT | Prices exclude VAT. Rate is a Settings field, still blank. |
 | Loyalty | Earn rate and redeem value are Settings fields, still blank. |
@@ -223,5 +226,6 @@ These do not block the app skeleton.
 1. **Supabase CLI login**, if it is not already authenticated, when step 4 creates the `dental` schema. The project ref and keys are already in `app/.env.local`.
 2. **VAT percentage.** Needed before real invoices.
 3. **Loyalty rates.** Needed before points go live.
-4. **MyCash account number.** Documents show “Pending” until the clinic has one.
-5. **Meta Cloud API.** Step 37: second API number + `WHATSAPP_*` secrets after M2B Verified. Do not invent tokens or phone number id.
+4. **FX rates (SLSH / ETB per USD).** Settings → Exchange rates — blank until clinic confirms. Do not invent.
+5. **MyCash account number.** Documents show “Pending” until the clinic has one.
+6. **Meta Cloud API.** Step 37: second API number + `WHATSAPP_*` secrets after M2B Verified. Do not invent tokens or phone number id.

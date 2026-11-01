@@ -16,13 +16,13 @@ import {
   setBranchActive,
   updateBranch,
 } from '../lib/branches/api.ts'
-import type { Branch } from '../lib/branches/types.ts'
+import type { Branch, BranchRegion } from '../lib/branches/types.ts'
 import { fetchClinicSettings, updateClinicSettings } from '../lib/loyalty/api.ts'
-import { formatTaxPercent } from '../lib/money.ts'
+import { formatTaxPercent, regionLabel } from '../lib/money.ts'
 import { fetchGoLiveStatus, updateGoLiveChecklist } from '../lib/reports/api.ts'
 import type { GoLiveStatus } from '../lib/reports/types.ts'
 
-type Tab = 'branches' | 'tax' | 'categories' | 'loyalty' | 'golive'
+type Tab = 'branches' | 'tax' | 'categories' | 'fx' | 'loyalty' | 'golive'
 
 export function SettingsPage() {
   const [tab, setTab] = useState<Tab>('tax')
@@ -35,7 +35,8 @@ export function SettingsPage() {
       <div>
         <h1 className="text-3xl font-semibold">Settings</h1>
         <p className="mt-1 text-sm text-muted">
-          Shared catalog settings. VAT and loyalty rates stay blank until the owner fills them in.
+          Shared catalog settings. VAT, loyalty, and FX rates stay blank until the owner fills them
+          in. Ledger stays USD.
         </p>
       </div>
       <div className="flex flex-wrap gap-2 border-b border-line">
@@ -51,6 +52,11 @@ export function SettingsPage() {
           Categories
         </TabButton>
         {isOwner ? (
+          <TabButton active={tab === 'fx'} onClick={() => setTab('fx')}>
+            Exchange rates
+          </TabButton>
+        ) : null}
+        {isOwner ? (
           <TabButton active={tab === 'loyalty'} onClick={() => setTab('loyalty')}>
             Loyalty
           </TabButton>
@@ -64,6 +70,7 @@ export function SettingsPage() {
       {tab === 'branches' && isOwner ? <BranchesPanel queryClient={queryClient} /> : null}
       {tab === 'tax' ? <TaxRatesPanel queryClient={queryClient} /> : null}
       {tab === 'categories' ? <CategoriesPanel queryClient={queryClient} /> : null}
+      {tab === 'fx' && isOwner ? <FxRatesPanel queryClient={queryClient} /> : null}
       {tab === 'loyalty' && isOwner ? <LoyaltySettingsPanel queryClient={queryClient} /> : null}
       {tab === 'golive' && isOwner ? <GoLivePanel queryClient={queryClient} /> : null}
     </section>
@@ -79,6 +86,7 @@ function BranchesPanel({ queryClient }: { queryClient: ReturnType<typeof useQuer
   const [editing, setEditing] = useState<Branch | null>(null)
   const [creating, setCreating] = useState(false)
   const [name, setName] = useState('')
+  const [region, setRegion] = useState<BranchRegion>('somaliland')
   const [address, setAddress] = useState('')
   const [phone, setPhone] = useState('')
   const [taxId, setTaxId] = useState('')
@@ -90,6 +98,7 @@ function BranchesPanel({ queryClient }: { queryClient: ReturnType<typeof useQuer
 
   function resetForm() {
     setName('')
+    setRegion('somaliland')
     setAddress('')
     setPhone('')
     setTaxId('')
@@ -111,6 +120,7 @@ function BranchesPanel({ queryClient }: { queryClient: ReturnType<typeof useQuer
     setCreating(false)
     setEditing(branch)
     setName(branch.name)
+    setRegion(branch.region === 'ethiopia' ? 'ethiopia' : 'somaliland')
     setAddress(branch.address ?? '')
     setPhone(branch.phone ?? '')
     setTaxId(branch.tax_id ?? '')
@@ -132,6 +142,7 @@ function BranchesPanel({ queryClient }: { queryClient: ReturnType<typeof useQuer
       if (!name.trim()) throw new Error('Branch name is required.')
       const payload = {
         name,
+        region,
         address,
         phone,
         tax_id: taxId,
@@ -226,6 +237,17 @@ function BranchesPanel({ queryClient }: { queryClient: ReturnType<typeof useQuer
               />
             </label>
             <label className="block text-sm font-semibold md:col-span-2">
+              Region
+              <select
+                value={region}
+                onChange={(e) => setRegion(e.target.value as BranchRegion)}
+                className="mt-1 h-10 w-full rounded-dentaflow border border-line bg-canvas px-3 font-normal"
+              >
+                <option value="somaliland">Somaliland (docs: USD + SLSH)</option>
+                <option value="ethiopia">Ethiopia (docs: USD + ETB)</option>
+              </select>
+            </label>
+            <label className="block text-sm font-semibold md:col-span-2">
               Address
               <input
                 value={address}
@@ -300,6 +322,7 @@ function BranchesPanel({ queryClient }: { queryClient: ReturnType<typeof useQuer
           <thead className="border-b border-line bg-subtle text-xs tracking-wide text-muted uppercase">
             <tr>
               <th className="px-4 py-3 font-semibold">Name</th>
+              <th className="px-4 py-3 font-semibold">Region</th>
               <th className="px-4 py-3 font-semibold">Address</th>
               <th className="px-4 py-3 font-semibold">Phone</th>
               <th className="px-4 py-3 font-semibold">Status</th>
@@ -309,13 +332,13 @@ function BranchesPanel({ queryClient }: { queryClient: ReturnType<typeof useQuer
           <tbody>
             {branchesQuery.isLoading ? (
               <tr>
-                <td colSpan={5} className="px-4 py-8 text-muted">
+                <td colSpan={6} className="px-4 py-8 text-muted">
                   Loading branches…
                 </td>
               </tr>
             ) : rows.length === 0 ? (
               <tr>
-                <td colSpan={5} className="px-4 py-8 text-muted">
+                <td colSpan={6} className="px-4 py-8 text-muted">
                   No branches yet.
                 </td>
               </tr>
@@ -323,6 +346,7 @@ function BranchesPanel({ queryClient }: { queryClient: ReturnType<typeof useQuer
               rows.map((branch) => (
                 <tr key={branch.id} className="border-b border-line last:border-0">
                   <td className="px-4 py-3 font-semibold">{branch.name}</td>
+                  <td className="px-4 py-3 text-muted">{regionLabel(branch.region)}</td>
                   <td className="px-4 py-3 text-muted">{branch.address ?? '—'}</td>
                   <td className="px-4 py-3 font-mono text-xs">{branch.phone ?? '—'}</td>
                   <td className="px-4 py-3">{branch.active ? 'Active' : 'Inactive'}</td>
@@ -528,6 +552,111 @@ function Stat({ label, value }: { label: string; value: number }) {
       <dt className="text-[10px] uppercase text-muted">{label}</dt>
       <dd className="mt-1 font-mono text-base font-extrabold">{value}</dd>
     </div>
+  )
+}
+
+function FxRatesPanel({ queryClient }: { queryClient: ReturnType<typeof useQueryClient> }) {
+  const settingsQuery = useQuery({ queryKey: ['clinic_settings'], queryFn: fetchClinicSettings })
+  const [slsh, setSlsh] = useState('')
+  const [etb, setEtb] = useState('')
+  const [error, setError] = useState<string | null>(null)
+  const [info, setInfo] = useState<string | null>(null)
+
+  useEffect(() => {
+    const s = settingsQuery.data
+    if (!s) return
+    setSlsh(s.fx_slsh_per_usd == null ? '' : String(s.fx_slsh_per_usd))
+    setEtb(s.fx_etb_per_usd == null ? '' : String(s.fx_etb_per_usd))
+  }, [settingsQuery.data])
+
+  const saveMutation = useMutation({
+    mutationFn: updateClinicSettings,
+    onSuccess: async () => {
+      setError(null)
+      setInfo('Exchange rates saved.')
+      await queryClient.invalidateQueries({ queryKey: ['clinic_settings'] })
+    },
+    onError: (err: Error) => {
+      setInfo(null)
+      setError(err.message)
+    },
+  })
+
+  function onSave(event: FormEvent) {
+    event.preventDefault()
+    const slshN = slsh.trim() === '' ? null : Number(slsh)
+    const etbN = etb.trim() === '' ? null : Number(etb)
+    if (slshN != null && (Number.isNaN(slshN) || slshN <= 0)) {
+      setError('SLSH per USD must be a number above 0, or blank.')
+      return
+    }
+    if (etbN != null && (Number.isNaN(etbN) || etbN <= 0)) {
+      setError('ETB per USD must be a number above 0, or blank.')
+      return
+    }
+    saveMutation.mutate({
+      fx_slsh_per_usd: slshN,
+      fx_etb_per_usd: etbN,
+      clear_fx_slsh: slshN == null,
+      clear_fx_etb: etbN == null,
+    })
+  }
+
+  const updatedAt = settingsQuery.data?.fx_rates_updated_at
+
+  return (
+    <form
+      onSubmit={onSave}
+      className="max-w-xl space-y-4 rounded-dentaflow border border-line bg-surface p-5 text-sm"
+    >
+      <div>
+        <h2 className="font-display text-base font-bold">Exchange rates</h2>
+        <p className="mt-1 text-xs text-muted">
+          Units of foreign currency per 1 USD. Somaliland branches print USD+SLSH; Ethiopia
+          branches print USD+ETB. Leave blank until confirmed — ledger stays USD.
+        </p>
+      </div>
+      {error ? <p className="text-xs text-status-red">{error}</p> : null}
+      {info ? <p className="text-xs text-status-green">{info}</p> : null}
+      {updatedAt ? (
+        <p className="text-[11px] text-muted">
+          Rates last updated {new Date(updatedAt).toLocaleString()}
+        </p>
+      ) : null}
+      <label className="block space-y-1">
+        <span className="text-xs font-bold">SLSH per 1 USD</span>
+        <input
+          type="number"
+          min="0"
+          step="any"
+          value={slsh}
+          onChange={(e) => setSlsh(e.target.value)}
+          placeholder="Blank until confirmed"
+          className="h-10 w-full rounded-dentaflow border border-line bg-canvas px-3 font-mono"
+        />
+      </label>
+      <label className="block space-y-1">
+        <span className="text-xs font-bold">ETB per 1 USD</span>
+        <input
+          type="number"
+          min="0"
+          step="any"
+          value={etb}
+          onChange={(e) => setEtb(e.target.value)}
+          placeholder="Blank until confirmed"
+          className="h-10 w-full rounded-dentaflow border border-line bg-canvas px-3 font-mono"
+        />
+      </label>
+      <div className="flex justify-end">
+        <button
+          type="submit"
+          disabled={saveMutation.isPending}
+          className="rounded-dentaflow bg-marine px-4 py-2 text-xs font-bold text-white disabled:opacity-60"
+        >
+          Save exchange rates
+        </button>
+      </div>
+    </form>
   )
 }
 

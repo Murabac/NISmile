@@ -19,7 +19,13 @@ import { useAuth } from '../lib/auth.tsx'
 import { linkAppointmentSale } from '../lib/appointments/api.ts'
 import { fetchItems, fetchServices, basePrice } from '../lib/catalog/api.ts'
 import type { CatalogItem, CatalogService } from '../lib/catalog/types.ts'
-import { formatMoney } from '../lib/money.ts'
+import {
+  foreignCurrencyForRegion,
+  formatForeign,
+  formatMoney,
+  formatMoneyForRegion,
+  rateForRegion,
+} from '../lib/money.ts'
 import { customerArBalance } from '../lib/customers/api.ts'
 import { fetchClinicSettings, previewLoyaltyRedeem } from '../lib/loyalty/api.ts'
 import { evaluateCartPromotion } from '../lib/promotions/api.ts'
@@ -59,7 +65,7 @@ const emptyTenders = (): TenderDraft => ({
 })
 
 export function PosPage() {
-  const { branchId } = useAuth()
+  const { branchId, branches } = useAuth()
   const queryClient = useQueryClient()
   const navigate = useNavigate()
   const [searchParams] = useSearchParams()
@@ -70,6 +76,7 @@ export function PosPage() {
   const [customerId, setCustomerIdState] = useState<string>('walk-in')
   const [cart, setCart] = useState<CartLine[]>([])
   const [tenders, setTenders] = useState<TenderDraft>(emptyTenders)
+  const [foreignPay, setForeignPay] = useState('')
   const [chargeToAccount, setChargeToAccount] = useState(false)
   const [dueDate, setDueDate] = useState(() => defaultDueDate())
   const [error, setError] = useState<string | null>(null)
@@ -81,6 +88,9 @@ export function PosPage() {
   const [redeemLoyalty, setRedeemLoyalty] = useState(false)
   const [appointmentId, setAppointmentId] = useState<string | null>(null)
   const prefillsApplied = useRef<string | null>(null)
+
+  const activeBranch = branches.find((b) => b.id === branchId)
+  const branchRegion = activeBranch?.region ?? 'somaliland'
 
   function setCustomerId(id: string) {
     setCustomerIdState(id)
@@ -262,6 +272,8 @@ export function PosPage() {
 
   const promoName = promoQuery.data?.name ?? promoQuery.data?.code ?? null
   const settings = settingsQuery.data
+  const fxRate = rateForRegion(branchRegion, settings)
+  const foreignCode = foreignCurrencyForRegion(branchRegion)
   const loyaltyBalance = selectedCustomer?.loyalty_points ?? 0
   const minRedeemOk =
     settings?.loyalty_min_redeem_points == null ||
@@ -1059,12 +1071,48 @@ export function PosPage() {
             </div>
             <div className="flex justify-between border-t border-line pt-2 text-sm">
               <span className="font-bold">Total</span>
-              <span className="font-mono font-extrabold">{formatMoney(cartTotals.total)}</span>
+              <span className="text-end font-mono font-extrabold">
+                {formatMoneyForRegion(cartTotals.total, branchRegion, settings)}
+              </span>
             </div>
           </div>
 
           <div className="space-y-2">
             <h2 className="text-sm font-bold">Payments</h2>
+            {fxRate != null ? (
+              <div className="rounded-dentaflow border border-line bg-canvas p-2 text-[11px]">
+                <label className="flex flex-wrap items-end gap-2 font-semibold">
+                  <span className="min-w-[7rem]">Pay in {foreignCode}</span>
+                  <input
+                    type="number"
+                    min="0"
+                    step="any"
+                    value={foreignPay}
+                    onChange={(e) => setForeignPay(e.target.value)}
+                    placeholder={`Amount in ${foreignCode}`}
+                    className="h-8 min-w-[7rem] flex-1 rounded-md border border-line bg-surface px-2 font-mono"
+                  />
+                  <button
+                    type="button"
+                    className="rounded-md bg-marine px-2 py-1.5 text-[10px] font-bold text-white"
+                    onClick={() => {
+                      const n = Number(foreignPay)
+                      if (!Number.isFinite(n) || n <= 0 || fxRate <= 0) return
+                      const usd = round2(n / fxRate)
+                      const capped = Math.min(usd, maxForTender('cash'))
+                      setTenderAmount('cash', capped > 0 ? String(capped) : '')
+                      setForeignPay('')
+                    }}
+                  >
+                    → Cash USD
+                  </button>
+                </label>
+                <p className="mt-1 text-muted">
+                  Converts at clinic rate (
+                  {formatForeign(1, foreignCode, fxRate)} per $1) into Cash tender.
+                </p>
+              </div>
+            ) : null}
             <div className="grid grid-cols-2 gap-2">
               {(Object.keys(TENDER_LABELS) as PaymentTender[]).map((tender) => (
                 <label key={tender} className="rounded-dentaflow border border-line bg-canvas p-2">

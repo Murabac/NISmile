@@ -7,12 +7,14 @@ import {
   type ReactNode,
 } from 'react'
 import type { Session } from '@supabase/supabase-js'
+import type { BranchRegion } from './branches/types.ts'
 import type { StaffRole } from './database.types.ts'
 import { supabase } from './supabase.ts'
 
 type Branch = {
   id: string
   name: string
+  region: BranchRegion
   address: string | null
 }
 
@@ -70,11 +72,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   async function loadBranches() {
     const { data, error } = await supabase
       .from('branches')
-      .select('id, name, address')
+      .select('id, name, region, address')
       .eq('active', true)
       .order('name')
     if (error) throw error
-    setBranches(data ?? [])
+    setBranches(
+      (data ?? []).map((b) => ({
+        ...b,
+        region: b.region === 'ethiopia' ? 'ethiopia' : 'somaliland',
+      })),
+    )
   }
 
   useEffect(() => {
@@ -95,11 +102,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           .select('user_id, role, name')
           .eq('user_id', id)
           .single(),
-        supabase.from('branches').select('id, name, address').eq('active', true).order('name'),
+        supabase
+          .from('branches')
+          .select('id, name, region, address')
+          .eq('active', true)
+          .order('name'),
       ])
       if (cancelled) return
       setProfile(profileResult.data ?? null)
-      setBranches(branchResult.data ?? [])
+      setBranches(
+        (branchResult.data ?? []).map((b) => ({
+          ...b,
+          region: b.region === 'ethiopia' ? 'ethiopia' : 'somaliland',
+        })),
+      )
       setLoading(false)
     }
 

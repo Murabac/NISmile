@@ -25,7 +25,10 @@ import {
   type CustomerType,
   type WholesaleSubtype,
 } from '../lib/customers/types.ts'
-import { formatMoney } from '../lib/money.ts'
+import { fetchClinicSettings } from '../lib/loyalty/api.ts'
+import { formatMoney, formatMoneyForRegion } from '../lib/money.ts'
+import { supabase } from '../lib/supabase.ts'
+import type { BranchRegion } from '../lib/branches/types.ts'
 import {
   applyCustomerPayment,
   fetchCustomerSales,
@@ -81,6 +84,23 @@ export function CustomersPage() {
   const customers = customersQuery.data ?? []
   const selected = customers.find((c) => c.id === selectedId) ?? null
 
+  const settingsQuery = useQuery({
+    queryKey: ['clinic_settings'],
+    queryFn: fetchClinicSettings,
+  })
+  const customerBranchQuery = useQuery({
+    queryKey: ['branch_region', selected?.branch_id],
+    enabled: Boolean(selected?.branch_id),
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('branches')
+        .select('region')
+        .eq('id', selected!.branch_id)
+        .maybeSingle()
+      if (error) throw error
+      return (data?.region === 'ethiopia' ? 'ethiopia' : 'somaliland') as BranchRegion
+    },
+  })
   const statementQuery = useQuery({
     queryKey: ['customer_statement', selected?.id],
     queryFn: () => fetchCustomerStatement(selected!.id),
@@ -588,6 +608,11 @@ export function CustomersPage() {
                 customer={selected}
                 lines={statementQuery.data?.lines ?? []}
                 outstanding={statementQuery.data?.outstanding ?? 0}
+                outstandingFx={formatMoneyForRegion(
+                  statementQuery.data?.outstanding ?? 0,
+                  customerBranchQuery.data ?? 'somaliland',
+                  settingsQuery.data,
+                )}
                 loading={statementQuery.isLoading}
                 error={
                   statementQuery.isError
@@ -713,12 +738,14 @@ function AccountStatementDocument({
   customer,
   lines,
   outstanding,
+  outstandingFx,
   loading,
   error,
 }: {
   customer: Customer
   lines: StatementLine[]
   outstanding: number
+  outstandingFx: string
   loading: boolean
   error: string | null
 }) {
@@ -782,10 +809,13 @@ function AccountStatementDocument({
           <p className="text-[10px] font-bold tracking-wide text-[#536E75] uppercase">
             Amount due
           </p>
-          <p className="mt-1 text-2xl font-black tracking-tight text-[#0C3B4A] tabular-nums">
-            {formatMoney(outstanding)}
+          <p className="mt-1 text-xl font-black tracking-tight text-[#0C3B4A] tabular-nums">
+            {outstandingFx}
           </p>
-          <p className="mt-1 text-[#536E75]">Open AR balance in USD</p>
+          <p className="mt-1 text-[#536E75]">
+            Open AR (USD ledger
+            {outstandingFx !== formatMoney(outstanding) ? ' + regional FX' : ''})
+          </p>
         </div>
       </div>
 

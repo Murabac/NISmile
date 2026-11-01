@@ -1,6 +1,9 @@
+export type BranchRegion = 'somaliland' | 'ethiopia'
+
 export type Branch = {
   id: string
   name: string
+  region: BranchRegion
   address: string | null
   phone: string | null
   tax_id: string | null
@@ -13,6 +16,7 @@ export type Branch = {
 
 export type BranchInput = {
   name: string
+  region: BranchRegion
   address?: string | null
   phone?: string | null
   tax_id?: string | null

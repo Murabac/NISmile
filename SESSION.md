@@ -11,19 +11,15 @@ Short note so either machine can continue without Cursor chat history.
 
 ## Current product step
 
-**35 — Promotions Send WhatsApp** (not started).  
-Steps 32–34 (sale / AR / appointment one-click WhatsApp) are done on Meta **test** number. Production API number is still human (**step 37**).
+Apply **`20261017150000_dental_branch_region_fx.sql`** on Supabase; owner fills Exchange rates.  
+WhatsApp **36/37** still open. Step **38** (regions + FX) is in the codebase.
 
 ## What landed recently (pull before continuing)
 
-- Coolify Docker for staff UI (`Dockerfile`, `app/nginx.conf`) — from the other machine; finish domain + Auth URL config if needed
-- Sale WhatsApp copy: total / paid / open balance + 7-day due wording
-- POS: reject tender overpay
-- AR payment reminder + Dashboard/Customers WhatsApp buttons
-- Appointment Send confirmation / reminder; reply **1** confirm / **2** cancel with ack text
-- Customer Care footer on free-form WhatsApp (`wa.me` care line)
-- Sale WhatsApp also sends English **A4 PDF** document (`sale-documents` bucket + `send-whatsapp`)
-- Migrations through `20261017140000_sale_whatsapp_pdf.sql` — apply on remote if a machine’s DB is behind
+- Coolify Docker for staff UI (`Dockerfile`, `app/nginx.conf`)
+- Steps 32–35 one-click WhatsApp + promotions Send WhatsApp
+- Step 38: branch `region`, Settings FX (SLSH/ETB per USD), POS dual total, docs/PDF dual currency
+- Migrations through `20261017150000_dental_branch_region_fx.sql` — **apply on remote**
 
 ## Cross-machine checklist
 
@@ -41,12 +37,11 @@ cd app && npm install
 
 - Meta temporary Graph tokens expire; refresh `WHATSAPP_ACCESS_TOKEN` in Edge secrets when sends return Access denied  
 - Webhook must stay `verify_jwt = false` and subscribe to **messages**  
-- Reply acks only match **scheduled/confirmed** appointments (skip cancelled)  
-- PDF attachment only on free-form **text** sale sends (not `hello_world` fallback)  
-- Customer Care WhatsApp is a separate human number from the Cloud API sender  
+- Promo Send WhatsApp processes the due queue in batches of 20 (may also flush other pending utility rows)  
+- Coolify custom domain needs Ports Exposes `80` + Domains `https://nismile.m2btek.com` + healthy container  
 
 ## Next build focus
 
-Implement **step 35** — promotions Send WhatsApp — then docs / e2e (36) and production Meta number (37).
+**36** — docs / e2e checklist against Meta test number; then **37** production API number.
 
 Update this file when you finish a chunk of work on either machine.

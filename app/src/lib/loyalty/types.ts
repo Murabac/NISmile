@@ -5,6 +5,9 @@ export type ClinicSettings = {
   loyalty_usd_per_point: number | null
   loyalty_min_redeem_points: number | null
   loyalty_expire_days: number | null
+  fx_slsh_per_usd: number | null
+  fx_etb_per_usd: number | null
+  fx_rates_updated_at: string | null
   updated_at: string
 }
 
@@ -39,9 +42,13 @@ export type UpdateClinicSettingsInput = {
   loyalty_usd_per_point?: number | null
   loyalty_min_redeem_points?: number | null
   loyalty_expire_days?: number | null
+  fx_slsh_per_usd?: number | null
+  fx_etb_per_usd?: number | null
   clear_vat?: boolean
   clear_loyalty_earn?: boolean
   clear_loyalty_redeem?: boolean
   clear_loyalty_min?: boolean
   clear_loyalty_expire?: boolean
+  clear_fx_slsh?: boolean
+  clear_fx_etb?: boolean
 }

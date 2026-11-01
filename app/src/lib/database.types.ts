@@ -68,6 +68,7 @@ export type Database = {
         Row: {
           id: string
           name: string
+          region: 'somaliland' | 'ethiopia'
           address: string | null
           phone: string | null
           tax_id: string | null
@@ -80,6 +81,7 @@ export type Database = {
         Insert: {
           id?: string
           name: string
+          region?: 'somaliland' | 'ethiopia'
           address?: string | null
           phone?: string | null
           tax_id?: string | null
@@ -91,6 +93,7 @@ export type Database = {
         }
         Update: {
           name?: string
+          region?: 'somaliland' | 'ethiopia'
           address?: string | null
           phone?: string | null
           tax_id?: string | null
@@ -1268,6 +1271,9 @@ export type Database = {
           loyalty_usd_per_point: number | null
           loyalty_min_redeem_points: number | null
           loyalty_expire_days: number | null
+          fx_slsh_per_usd: number | null
+          fx_etb_per_usd: number | null
+          fx_rates_updated_at: string | null
           go_live: Record<string, unknown>
           updated_by: string | null
           updated_at: string
@@ -1280,6 +1286,9 @@ export type Database = {
           loyalty_usd_per_point?: number | null
           loyalty_min_redeem_points?: number | null
           loyalty_expire_days?: number | null
+          fx_slsh_per_usd?: number | null
+          fx_etb_per_usd?: number | null
+          fx_rates_updated_at?: string | null
           go_live?: Record<string, unknown>
           updated_by?: string | null
           updated_at?: string
@@ -1291,6 +1300,9 @@ export type Database = {
           loyalty_usd_per_point?: number | null
           loyalty_min_redeem_points?: number | null
           loyalty_expire_days?: number | null
+          fx_slsh_per_usd?: number | null
+          fx_etb_per_usd?: number | null
+          fx_rates_updated_at?: string | null
           go_live?: Record<string, unknown>
           updated_by?: string | null
           updated_at?: string
@@ -1808,6 +1820,10 @@ export type Database = {
           p_clear_loyalty_redeem?: boolean
           p_clear_loyalty_min?: boolean
           p_clear_loyalty_expire?: boolean
+          p_fx_slsh_per_usd?: number | null
+          p_fx_etb_per_usd?: number | null
+          p_clear_fx_slsh?: boolean
+          p_clear_fx_etb?: boolean
         }
         Returns: unknown
       }
