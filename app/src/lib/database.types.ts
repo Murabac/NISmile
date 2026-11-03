@@ -2083,6 +2083,14 @@ export type Database = {
         Args: { p_sale_id: string }
         Returns: string | null
       }
+      notify_appointment_whatsapp: {
+        Args: { p_appointment_id: string; p_kind?: string }
+        Returns: string | null
+      }
+      notify_ar_payment_reminder: {
+        Args: { p_customer_id: string; p_sale_id?: string | null }
+        Returns: string | null
+      }
       process_return: {
         Args: {
           p_branch_id: string
