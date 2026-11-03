@@ -20,6 +20,9 @@ WhatsApp **36/37** still open. Step **38** (regions + FX) is in the codebase.
 - Steps 32–35 one-click WhatsApp + promotions Send WhatsApp
 - Step 38: branch `region`, Settings FX (SLSH/ETB per USD), POS dual total, docs/PDF dual currency
 - Migrations through `20261017150000_dental_branch_region_fx.sql` — **apply on remote**
+- **Patient roster (live DB):** **1774** retail patients on N.I SMILE Hargeisa (`en`, opt-in true). Location in notes (`CLINIC-PATIENT-LIST-2026-11 | …`). Phones normalized to `+252…` when usable (**94** with phone; rest null / raw kept in notes). Data: `app/scripts/data/clinic-patient-roster.tsv`. Script: `app/scripts/enrich-clinic-patients.mjs` (requires `CONFIRM_CUSTOMER_RESET=YES`). Do not re-run casually.
+- **Stock catalog (live DB):** Shared **21** products (`NS-###`). Stock **split by branch** (not summed): **Hargeisa** retail **2790** units (12 with stock); **N.I SMILE Wholesale** **22945** units (9 with stock). Cost `0`, **no sell prices** yet. Restock clinic via **Transfers** (Wholesale → Hargeisa). Roster: `app/scripts/data/clinic-stock-roster.json` (`retail_qty` / `wholesale_qty`). Script: `app/scripts/split-wholesale-stock.mjs` (`CONFIRM_STOCK_RESET=YES`). Older sum script `reset-stock-catalog.mjs` is obsolete for live qty.
+- **Branches (active):** N.I SMILE Hargeisa, **N.I SMILE Wholesale** (new), **N.I SMILE Jigjiga** (already present). Demo **Hargeisa North** from transfers sample is not in this DB (was never real).
 
 ## Cross-machine checklist
 

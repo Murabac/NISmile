@@ -1,0 +1,23 @@
+[
+  { "name": "Oral spray", "retail_qty": 656, "wholesale_qty": 8500 },
+  { "name": "Coconut oil", "retail_qty": 46, "wholesale_qty": 180 },
+  { "name": "Cotton brush", "retail_qty": 384, "wholesale_qty": 1760 },
+  { "name": "Tooth paste", "retail_qty": 168, "wholesale_qty": 1800 },
+  { "name": "Dental floss", "retail_qty": 400, "wholesale_qty": 400 },
+  { "name": "Double brush", "retail_qty": 13, "wholesale_qty": 300 },
+  { "name": "Tongue cleaner", "retail_qty": 291, "wholesale_qty": 9101 },
+  { "name": "Electric toothbrush", "retail_qty": 337, "wholesale_qty": 468 },
+  { "name": "Children U brush", "retail_qty": 0, "wholesale_qty": 436 },
+  { "name": "U brush", "retail_qty": 292, "wholesale_qty": 0 },
+  { "name": "Mouth wash", "retail_qty": 23, "wholesale_qty": 0 },
+  { "name": "Children brush", "retail_qty": 25, "wholesale_qty": 0 },
+  { "name": "Floss kit", "retail_qty": 155, "wholesale_qty": 0 },
+  { "name": "Water flosser", "retail_qty": 0, "wholesale_qty": 0 },
+  { "name": "Interdental brush", "retail_qty": 0, "wholesale_qty": 0 },
+  { "name": "Electric scaler", "retail_qty": 0, "wholesale_qty": 0 },
+  { "name": "Children toothpaste", "retail_qty": 0, "wholesale_qty": 0 },
+  { "name": "Protection brush", "retail_qty": 0, "wholesale_qty": 0 },
+  { "name": "Circle electric brush", "retail_qty": 0, "wholesale_qty": 0 },
+  { "name": "Bamboo brush", "retail_qty": 0, "wholesale_qty": 0 },
+  { "name": "Finger baby water flosser", "retail_qty": 0, "wholesale_qty": 0 }
+]
