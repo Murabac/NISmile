@@ -4,9 +4,7 @@ import { Logo } from '../components/Logo.tsx'
 import { useAuth } from '../lib/auth.tsx'
 
 export function LoginPage() {
-  const { session, signIn, signUp } = useAuth()
-  const [mode, setMode] = useState<'sign-in' | 'create'>('sign-in')
-  const [name, setName] = useState('')
+  const { session, signIn } = useAuth()
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [message, setMessage] = useState<string | null>(null)
@@ -18,10 +16,7 @@ export function LoginPage() {
     event.preventDefault()
     setPending(true)
     setMessage(null)
-    const error =
-      mode === 'sign-in'
-        ? await signIn(email, password)
-        : await signUp(name.trim(), email, password)
+    const error = await signIn(email, password)
     setMessage(error)
     setPending(false)
   }
@@ -40,23 +35,12 @@ export function LoginPage() {
             </p>
           </div>
         </div>
-        <h1 className="text-2xl font-semibold">{mode === 'sign-in' ? 'Sign in' : 'Create account'}</h1>
+        <h1 className="text-2xl font-semibold">Sign in</h1>
         <p className="mt-1 text-sm text-muted">
           Staff access for N.I SMILE Oral care & Teeth whitening.
         </p>
 
         <form onSubmit={onSubmit} className="mt-5 space-y-3">
-          {mode === 'create' ? (
-            <label className="block text-sm font-semibold">
-              Name
-              <input
-                required
-                value={name}
-                onChange={(event) => setName(event.target.value)}
-                className="mt-1 h-10 w-full rounded-dentaflow border border-line bg-canvas px-3 font-normal"
-              />
-            </label>
-          ) : null}
           <label className="block text-sm font-semibold">
             Email
             <input
@@ -73,7 +57,7 @@ export function LoginPage() {
             <input
               required
               type="password"
-              autoComplete={mode === 'sign-in' ? 'current-password' : 'new-password'}
+              autoComplete="current-password"
               minLength={6}
               value={password}
               onChange={(event) => setPassword(event.target.value)}
@@ -86,19 +70,9 @@ export function LoginPage() {
             disabled={pending}
             className="h-10 w-full rounded-dentaflow bg-marine text-sm font-bold text-white disabled:opacity-60"
           >
-            {pending ? 'Please wait…' : mode === 'sign-in' ? 'Sign in' : 'Create account'}
+            {pending ? 'Please wait…' : 'Sign in'}
           </button>
         </form>
-        <button
-          type="button"
-          onClick={() => {
-            setMode((current) => (current === 'sign-in' ? 'create' : 'sign-in'))
-            setMessage(null)
-          }}
-          className="mt-4 text-sm font-semibold text-flow-teal"
-        >
-          {mode === 'sign-in' ? 'Create a staff account' : 'Already have an account? Sign in'}
-        </button>
       </div>
     </main>
   )
