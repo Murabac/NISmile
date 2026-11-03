@@ -123,7 +123,9 @@ export const screens: Screen[] = [
     label: 'WhatsApp',
     path: '/whatsapp',
     icon: MessageSquare,
-    roles: ['owner', 'branch_manager', 'receptionist'],
+    // Technical queue / templates / Process due — owner only.
+    // Other roles send WhatsApp from POS, Customers, Appointments, Promotions buttons.
+    roles: ['owner'],
   },
   {
     id: 'reports',

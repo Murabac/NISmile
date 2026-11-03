@@ -23,6 +23,11 @@ WhatsApp **36/37** still open. Step **38** (regions + FX) is in the codebase.
 - **Patient roster (live DB):** **1774** retail patients on N.I SMILE Hargeisa (`en`, opt-in true). Location in notes (`CLINIC-PATIENT-LIST-2026-11 | …`). Phones normalized to `+252…` when usable (**94** with phone; rest null / raw kept in notes). Data: `app/scripts/data/clinic-patient-roster.tsv`. Script: `app/scripts/enrich-clinic-patients.mjs` (requires `CONFIRM_CUSTOMER_RESET=YES`). Do not re-run casually.
 - **Stock catalog (live DB):** Shared **21** products (`NS-###`). Stock **split by branch** (not summed): **Hargeisa** retail **2790** units (12 with stock); **N.I SMILE Wholesale** **22945** units (9 with stock). Cost `0`, **no sell prices** yet. Restock clinic via **Transfers** (Wholesale → Hargeisa). Roster: `app/scripts/data/clinic-stock-roster.json` (`retail_qty` / `wholesale_qty`). Script: `app/scripts/split-wholesale-stock.mjs` (`CONFIRM_STOCK_RESET=YES`). Older sum script `reset-stock-catalog.mjs` is obsolete for live qty.
 - **Branches (active):** N.I SMILE Hargeisa, **N.I SMILE Wholesale** (new), **N.I SMILE Jigjiga** (already present). Demo **Hargeisa North** from transfers sample is not in this DB (was never real).
+- **Staff logins (4):** email/password only (no quick-login UI). Re-seed: `cd app && node scripts/seed-demo-users.mjs`.
+  - `owner@nismile.com` / `owner123` — owner (all three branches)
+  - `reception.hargeisa@nismile.com` / `receptionist123` — receptionist → Hargeisa
+  - `reception.jigjiga@nismile.com` / `receptionist123` — receptionist → Jigjiga
+  - `wholesale@nismile.com` / `wholesale123` — branch_manager → Wholesale + Hargeisa + Jigjiga (stock, transfers to both clinics, wholesale POS/sales, Customers AR / WhatsApp)
 
 ## Cross-machine checklist
 
@@ -37,6 +42,8 @@ cd app && npm install
 ```
 
 ## Known ops notes (no secrets)
+
+- **Meta message templates (N.I SMILE / `nis_*_en`):** all 12 kinds submitted on Test WABA. `nis_appointment_reminder_en` is **APPROVED**; the other 11 are **PENDING** Meta review. DentaFlow `message_templates` rows have matching `whatsapp_template_id` + `pending`/`approved`. After Meta marks Approved, flip those rows to `approved` so Cloud API uses templates (until then sends may use free-form text inside the 24h window).
 
 - Meta temporary Graph tokens expire; refresh `WHATSAPP_ACCESS_TOKEN` in Edge secrets when sends return Access denied  
 - Webhook must stay `verify_jwt = false` and subscribe to **messages**  

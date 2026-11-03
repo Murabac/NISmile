@@ -138,7 +138,7 @@ Work in order. Finish a step before starting the next one inside the same phase.
 2. **App skeleton.** Done. `app/` is Vite, React, TypeScript, and Tailwind 4. `Design Ref/` is untouched. English UI only.
 3. **Theme.** Done. Tokens, fonts, dark mode, logo, 10px radius, and print hooks are in `app/`. Left-to-right layout. No language switcher.
 4. **Database.** Done. `dental` is exposed on project `iwnswhnoxbvgyqljfvel`. One branch is seeded. `profiles`, `user_branches`, and `customers` exist, with row-level security. The client is `app/src/lib/supabase.ts` and uses only the anon key. The first email signup becomes the owner.
-5. **Shell.** Done. Email sign-in and account creation, marine sidebar, header, branch switcher, and role-gated routes for the 13 screens. Owners can use All branches on Dashboard and Reports. Login has quick buttons for the five demo roles (`owner@nismile.local` through `storekeeper@nismile.local`, password `dentaflow-demo`). Re-seed with `node scripts/seed-demo-users.mjs` from `app/`. No in-app role switcher and no language switcher.
+5. **Shell.** Done. Email sign-in and account creation, marine sidebar, header, branch switcher, and role-gated routes for the 13 screens. Owners can use All branches on Dashboard and Reports. Four staff accounts (no quick-login buttons) on `@nismile.com` with passwords `{role}123` — see `SESSION.md`. Re-seed with `node scripts/seed-demo-users.mjs` from `app/`. No in-app role switcher and no language switcher.
 6. **WhatsApp prep (human, in parallel).** Meta Business verification for M2B + dedicated API number. Phase 6 returned to Meta Cloud API after leaving Twilio.
 
 ### Phase 1 — Inventory and import (about 2–3 weeks)

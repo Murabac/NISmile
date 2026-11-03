@@ -661,7 +661,7 @@ export function AppointmentsPage() {
                     value={newDentistEmail}
                     onChange={(event) => setNewDentistEmail(event.target.value)}
                     className="mt-1 h-9 w-full rounded-md border border-line bg-surface px-2 font-normal"
-                    placeholder="dentist@nismile.local"
+                    placeholder="dentist@nismile.com"
                   />
                 </label>
                 <label className="block text-xs font-semibold">
