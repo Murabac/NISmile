@@ -19,5 +19,7 @@
   { "name": "Protection brush", "retail_qty": 0, "wholesale_qty": 0 },
   { "name": "Circle electric brush", "retail_qty": 0, "wholesale_qty": 0 },
   { "name": "Bamboo brush", "retail_qty": 0, "wholesale_qty": 0 },
-  { "name": "Finger baby water flosser", "retail_qty": 0, "wholesale_qty": 0 }
+  { "name": "Finger baby water flosser", "retail_qty": 0, "wholesale_qty": 0 },
+  { "name": "Nano toothpaste", "retail_qty": 0, "wholesale_qty": 0 },
+  { "name": "Soft toothbrush", "retail_qty": 0, "wholesale_qty": 0 }
 ]
