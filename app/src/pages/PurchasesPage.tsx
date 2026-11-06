@@ -12,8 +12,11 @@ import {
   fetchSuppliers,
   poTotal,
   receivePurchaseOrder,
+  setSupplierActive,
   statusLabel,
+  updateSupplier,
   type PurchaseOrder,
+  type Supplier,
 } from '../lib/purchases/api.ts'
 
 type Tab = 'orders' | 'suppliers'
@@ -34,6 +37,7 @@ export function PurchasesPage() {
   const [tab, setTab] = useState<Tab>('orders')
   const [createOpen, setCreateOpen] = useState(false)
   const [supplierOpen, setSupplierOpen] = useState(false)
+  const [editingSupplier, setEditingSupplier] = useState<Supplier | null>(null)
   const [receiveOrder, setReceiveOrder] = useState<PurchaseOrder | null>(null)
   const [error, setError] = useState<string | null>(null)
 
@@ -72,6 +76,7 @@ export function PurchasesPage() {
             type="button"
             onClick={() => {
               setError(null)
+              setEditingSupplier(null)
               setSupplierOpen(true)
             }}
             className="inline-flex h-10 items-center gap-2 rounded-dentaflow bg-marine px-4 text-sm font-bold text-white"
@@ -100,7 +105,12 @@ export function PurchasesPage() {
           }}
         />
       ) : (
-        <SuppliersPanel />
+        <SuppliersPanel
+          onEdit={(supplier) => {
+            setEditingSupplier(supplier)
+            setSupplierOpen(true)
+          }}
+        />
       )}
 
       <CreateOrderDrawer
@@ -112,11 +122,16 @@ export function PurchasesPage() {
           await queryClient.invalidateQueries({ queryKey: ['purchase_orders', branchId] })
         }}
       />
-      <CreateSupplierDrawer
+      <SupplierDrawer
         open={supplierOpen}
-        onClose={() => setSupplierOpen(false)}
+        supplier={editingSupplier}
+        onClose={() => {
+          setSupplierOpen(false)
+          setEditingSupplier(null)
+        }}
         onSaved={async () => {
           setSupplierOpen(false)
+          setEditingSupplier(null)
           await queryClient.invalidateQueries({ queryKey: ['suppliers'] })
         }}
       />
@@ -229,10 +244,18 @@ function OrdersPanel({
   )
 }
 
-function SuppliersPanel() {
+function SuppliersPanel({ onEdit }: { onEdit: (supplier: Supplier) => void }) {
+  const queryClient = useQueryClient()
   const suppliersQuery = useQuery({
     queryKey: ['suppliers'],
     queryFn: () => fetchSuppliers(true),
+  })
+
+  const toggleMutation = useMutation({
+    mutationFn: ({ id, active }: { id: string; active: boolean }) => setSupplierActive(id, active),
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ['suppliers'] })
+    },
   })
 
   return (
@@ -244,12 +267,13 @@ function SuppliersPanel() {
             <th className="px-4 py-3 font-semibold">Phone</th>
             <th className="px-4 py-3 font-semibold">Email</th>
             <th className="px-4 py-3 font-semibold">Status</th>
+            <th className="px-4 py-3 font-semibold">Actions</th>
           </tr>
         </thead>
         <tbody>
           {(suppliersQuery.data ?? []).length === 0 ? (
             <tr>
-              <td colSpan={4} className="px-4 py-8 text-muted">
+              <td colSpan={5} className="px-4 py-8 text-muted">
                 No suppliers yet.
               </td>
             </tr>
@@ -260,6 +284,27 @@ function SuppliersPanel() {
                 <td className="px-4 py-3 text-muted">{supplier.phone ?? '—'}</td>
                 <td className="px-4 py-3 text-muted">{supplier.email ?? '—'}</td>
                 <td className="px-4 py-3">{supplier.active ? 'Active' : 'Inactive'}</td>
+                <td className="px-4 py-3">
+                  <div className="flex flex-wrap gap-3">
+                    <button
+                      type="button"
+                      onClick={() => onEdit(supplier)}
+                      className="text-sm font-semibold text-flow-teal"
+                    >
+                      Edit
+                    </button>
+                    <button
+                      type="button"
+                      disabled={toggleMutation.isPending}
+                      onClick={() =>
+                        toggleMutation.mutate({ id: supplier.id, active: !supplier.active })
+                      }
+                      className="text-sm font-semibold text-flow-teal"
+                    >
+                      {supplier.active ? 'Deactivate' : 'Activate'}
+                    </button>
+                  </div>
+                </td>
               </tr>
             ))
           )}
@@ -269,12 +314,14 @@ function SuppliersPanel() {
   )
 }
 
-function CreateSupplierDrawer({
+function SupplierDrawer({
   open,
+  supplier,
   onClose,
   onSaved,
 }: {
   open: boolean
+  supplier: Supplier | null
   onClose: () => void
   onSaved: () => Promise<void>
 }) {
@@ -283,8 +330,23 @@ function CreateSupplierDrawer({
   const [email, setEmail] = useState('')
   const [notes, setNotes] = useState('')
   const [error, setError] = useState<string | null>(null)
+
+  useEffect(() => {
+    if (!open) return
+    setName(supplier?.name ?? '')
+    setPhone(supplier?.phone ?? '')
+    setEmail(supplier?.email ?? '')
+    setNotes(supplier?.notes ?? '')
+    setError(null)
+  }, [open, supplier])
+
   const mutation = useMutation({
-    mutationFn: createSupplier,
+    mutationFn: async () => {
+      if (supplier) {
+        return updateSupplier(supplier.id, { name, phone, email, notes })
+      }
+      return createSupplier({ name, phone, email, notes })
+    },
     onSuccess: async () => {
       setName('')
       setPhone('')
@@ -301,14 +363,14 @@ function CreateSupplierDrawer({
       setError('Supplier name is required.')
       return
     }
-    mutation.mutate({ name, phone, email, notes })
+    mutation.mutate()
   }
 
   return (
     <Drawer
       open={open}
       onClose={onClose}
-      title="New supplier"
+      title={supplier ? 'Edit supplier' : 'New supplier'}
       footer={
         <div className="flex justify-end gap-2">
           <button type="button" onClick={onClose} className="h-10 rounded-dentaflow border border-line px-4 text-sm font-semibold">

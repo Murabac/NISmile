@@ -17,7 +17,7 @@ import {
   CLINIC_TAX_ID,
   CLINIC_ZAAD,
 } from '../lib/clinic.ts'
-import { fetchCustomers, saveCustomer } from '../lib/customers/api.ts'
+import { fetchCustomers, saveCustomer, setCustomerActive } from '../lib/customers/api.ts'
 import {
   WHOLESALE_SUBTYPES,
   type Customer,
@@ -72,12 +72,14 @@ export function CustomersPage() {
   const [whatsappOptIn, setWhatsappOptIn] = useState(true)
   const [creditLimit, setCreditLimit] = useState('1000')
   const [notes, setNotes] = useState('')
+  const [active, setActive] = useState(true)
+  const [showInactive, setShowInactive] = useState(false)
 
   const branchReady = branchId !== 'all'
 
   const customersQuery = useQuery({
-    queryKey: ['customers', branchId],
-    queryFn: () => fetchCustomers(branchId),
+    queryKey: ['customers', branchId, showInactive],
+    queryFn: () => fetchCustomers(branchId, { includeInactive: showInactive }),
     enabled: branchReady,
   })
 
@@ -206,6 +208,7 @@ export function CustomersPage() {
     setWhatsappOptIn(true)
     setCreditLimit(tab === 'wholesale' ? '1000' : '')
     setNotes('')
+    setActive(true)
     setFormError(null)
     setDrawerOpen(true)
   }
@@ -219,6 +222,7 @@ export function CustomersPage() {
     setWhatsappOptIn(customer.whatsapp_opt_in)
     setCreditLimit(customer.credit_limit == null ? '' : String(customer.credit_limit))
     setNotes(customer.notes ?? '')
+    setActive(customer.active !== false)
     setFormError(null)
     setDrawerOpen(true)
   }
@@ -245,8 +249,20 @@ export function CustomersPage() {
       credit_limit:
         customerType === 'wholesale' && creditLimit !== '' ? Number(creditLimit) : null,
       notes: notes || null,
+      active,
     })
   }
+
+  const activeMutation = useMutation({
+    mutationFn: ({ id, next }: { id: string; next: boolean }) => setCustomerActive(id, next),
+    onSuccess: async (_void, vars) => {
+      setActive(vars.next)
+      if (editing?.id === vars.id) setEditing({ ...editing, active: vars.next })
+      await queryClient.invalidateQueries({ queryKey: ['customers'] })
+      await queryClient.invalidateQueries({ queryKey: ['pos_customers'] })
+    },
+    onError: (err: Error) => setFormError(err.message),
+  })
 
   if (!branchReady) {
     return (
@@ -299,15 +315,26 @@ export function CustomersPage() {
             Retail ({customers.filter((c) => c.customer_type === 'retail').length})
           </button>
         </div>
-        <label className="relative min-w-[220px] flex-1 sm:max-w-sm">
-          <Search className="pointer-events-none absolute start-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted" />
-          <input
-            value={search}
-            onChange={(event) => setSearch(event.target.value)}
-            placeholder="Search name or phone"
-            className="h-10 w-full rounded-dentaflow border border-line bg-canvas pe-3 ps-9 text-sm"
-          />
-        </label>
+        <div className="flex flex-wrap items-center gap-3">
+          <label className="inline-flex items-center gap-2 text-xs font-semibold text-muted">
+            <input
+              type="checkbox"
+              checked={showInactive}
+              onChange={(event) => setShowInactive(event.target.checked)}
+              className="rounded border-line"
+            />
+            Show inactive
+          </label>
+          <label className="relative min-w-[220px] flex-1 sm:max-w-sm">
+            <Search className="pointer-events-none absolute start-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted" />
+            <input
+              value={search}
+              onChange={(event) => setSearch(event.target.value)}
+              placeholder="Search name or phone"
+              className="h-10 w-full rounded-dentaflow border border-line bg-canvas pe-3 ps-9 text-sm"
+            />
+          </label>
+        </div>
       </div>
 
       <div className="grid grid-cols-1 items-start gap-5 lg:grid-cols-12">
@@ -324,14 +351,8 @@ export function CustomersPage() {
             filtered.map((customer) => {
               const isSelected = selected?.id === customer.id
               return (
-                <button
+                <div
                   key={customer.id}
-                  type="button"
-                  onClick={() => {
-                    setSelectedId(customer.id)
-                    setPayError(null)
-                    setStatementOpen(false)
-                  }}
                   className={`w-full rounded-dentaflow border p-4 text-start ${
                     isSelected
                       ? 'border-flow-teal bg-surface ring-2 ring-flow-teal/20'
@@ -339,7 +360,15 @@ export function CustomersPage() {
                   }`}
                 >
                   <div className="flex items-start justify-between gap-3">
-                    <div>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setSelectedId(customer.id)
+                        setPayError(null)
+                        setStatementOpen(false)
+                      }}
+                      className="min-w-0 flex-1 text-start"
+                    >
                       <div className="flex flex-wrap items-center gap-2">
                         <Users className="h-4 w-4 text-flow-teal" />
                         <h2 className="text-sm font-bold">{customer.name}</h2>
@@ -348,29 +377,46 @@ export function CustomersPage() {
                             {customer.subtype}
                           </span>
                         ) : null}
+                        {customer.active === false ? (
+                          <span className="rounded bg-subtle px-2 py-0.5 text-[10px] font-semibold text-status-red">
+                            Inactive
+                          </span>
+                        ) : null}
                       </div>
                       <p className="mt-1 text-xs text-muted">{customer.phone ?? 'No phone'}</p>
+                    </button>
+                    <div className="flex shrink-0 flex-col items-end gap-2">
+                      <button
+                        type="button"
+                        onClick={(event) => {
+                          event.stopPropagation()
+                          openEdit(customer)
+                        }}
+                        className="text-xs font-bold text-flow-teal"
+                      >
+                        Edit
+                      </button>
+                      {customer.customer_type === 'wholesale' ? (
+                        <div className="text-end text-xs">
+                          <p className="text-muted">Outstanding</p>
+                          <p className="font-mono font-bold text-status-amber">
+                            {formatMoney(customer.ar_balance ?? 0)}
+                          </p>
+                          <p className="mt-1 text-muted">
+                            Limit{' '}
+                            {customer.credit_limit == null || Number(customer.credit_limit) <= 0
+                              ? '—'
+                              : formatMoney(Number(customer.credit_limit))}
+                          </p>
+                        </div>
+                      ) : (
+                        <p className="text-[11px] font-semibold text-muted uppercase">
+                          {customer.whatsapp_opt_in ? 'WhatsApp' : 'No WA'}
+                        </p>
+                      )}
                     </div>
-                    {customer.customer_type === 'wholesale' ? (
-                      <div className="text-end text-xs">
-                        <p className="text-muted">Outstanding</p>
-                        <p className="font-mono font-bold text-status-amber">
-                          {formatMoney(customer.ar_balance ?? 0)}
-                        </p>
-                        <p className="mt-1 text-muted">
-                          Limit{' '}
-                          {customer.credit_limit == null || Number(customer.credit_limit) <= 0
-                            ? '—'
-                            : formatMoney(Number(customer.credit_limit))}
-                        </p>
-                      </div>
-                    ) : (
-                      <p className="text-[11px] font-semibold text-muted uppercase">
-                        {customer.whatsapp_opt_in ? 'WhatsApp' : 'No WA'}
-                      </p>
-                    )}
                   </div>
-                </button>
+                </div>
               )
             })
           )}
@@ -727,6 +773,26 @@ export function CustomersPage() {
               className="mt-1 w-full rounded-dentaflow border border-line bg-canvas px-3 py-2 font-normal"
             />
           </label>
+          {editing ? (
+            <div className="rounded-dentaflow border border-line bg-canvas p-3">
+              <p className="text-sm font-semibold">
+                Status: {active ? 'Active' : 'Inactive'}
+              </p>
+              <button
+                type="button"
+                disabled={activeMutation.isPending}
+                onClick={() =>
+                  activeMutation.mutate({ id: editing.id, next: !active })
+                }
+                className="mt-2 text-sm font-semibold text-flow-teal disabled:opacity-60"
+              >
+                {active ? 'Deactivate customer' : 'Activate customer'}
+              </button>
+              <p className="mt-1 text-xs text-muted">
+                Soft archive only — sales and appointments stay linked.
+              </p>
+            </div>
+          ) : null}
           {formError ? <p className="text-sm text-status-red">{formError}</p> : null}
         </form>
       </Drawer>

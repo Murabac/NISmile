@@ -11,7 +11,7 @@ Short note so either machine can continue without Cursor chat history.
 
 ## Current product step
 
-Apply **`20261017150000_dental_branch_region_fx.sql`** on Supabase; owner fills Exchange rates.  
+Apply **`20261018120000_dental_staff_admin_crud.sql`** on Supabase (staff admin RPCs, `customers.active`, expense category write grants).  
 WhatsApp **36/37** still open. Step **38** (regions + FX) is in the codebase.
 
 ## What landed recently (pull before continuing)
@@ -19,7 +19,8 @@ WhatsApp **36/37** still open. Step **38** (regions + FX) is in the codebase.
 - Coolify Docker for staff UI (`Dockerfile`, `app/nginx.conf`)
 - Steps 32–35 one-click WhatsApp + promotions Send WhatsApp
 - Step 38: branch `region`, Settings FX (SLSH/ETB per USD), POS dual total, docs/PDF dual currency
-- Migrations through `20261017150000_dental_branch_region_fx.sql` — **apply on remote**
+- **Owner staff + CRUD:** Settings → Users (`list/create/update_staff_user`, `set_staff_login_enabled`); Customers list Edit + soft `active`; tax/category rename; suppliers edit/activate; Settings → Expense categories. Migration `20261018120000_dental_staff_admin_crud.sql` — **apply on remote before Coolify relies on it**
+- Migrations through `20261018120000_dental_staff_admin_crud.sql` — **apply on remote**
 - **Patient roster (live DB):** **1774** retail patients on N.I SMILE Hargeisa (`en`, opt-in true). Location in notes (`CLINIC-PATIENT-LIST-2026-11 | …`). Phones normalized to `+252…` when usable (**94** with phone; rest null / raw kept in notes). Data: `app/scripts/data/clinic-patient-roster.tsv`. Script: `app/scripts/enrich-clinic-patients.mjs` (requires `CONFIRM_CUSTOMER_RESET=YES`). Do not re-run casually.
 - **Stock catalog (live DB):** Shared **23** products (`NS-001`–`NS-023`, incl. new **Nano toothpaste** / **Soft toothbrush**). Stock **per branch** (not summed): **Hargeisa** retail **2790** (12 with stock); **Wholesale** **22945** (9 with stock); **Jigjiga** retail **4390** (10 with stock). Cost `0`, **no sell prices** yet. Restock clinics via **Transfers** from Wholesale. Rosters: `clinic-stock-roster.json`, `jigjiga-stock-roster.json`. Scripts: `split-wholesale-stock.mjs`, `seed-jigjiga-stock.mjs` (`CONFIRM_STOCK_RESET=YES`).
 - **Branches (active):** N.I SMILE Hargeisa, **N.I SMILE Wholesale** (new), **N.I SMILE Jigjiga** (already present). Demo **Hargeisa North** from transfers sample is not in this DB (was never real).
@@ -52,6 +53,7 @@ cd app && npm install
 
 ## Next build focus
 
+Apply staff-admin migration on remote, then smoke-test Settings → Users (create receptionist, assign branches, disable login).  
 **36** — docs / e2e checklist against Meta test number; then **37** production API number.
 
 Update this file when you finish a chunk of work on either machine.

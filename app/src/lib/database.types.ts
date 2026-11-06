@@ -150,6 +150,7 @@ export type Database = {
           credit_limit: number | null
           loyalty_points: number
           notes: string | null
+          active: boolean
           created_at: string
         }
         Insert: {
@@ -164,6 +165,7 @@ export type Database = {
           credit_limit?: number | null
           loyalty_points?: number
           notes?: string | null
+          active?: boolean
           created_at?: string
         }
         Update: {
@@ -177,6 +179,7 @@ export type Database = {
           credit_limit?: number | null
           loyalty_points?: number
           notes?: string | null
+          active?: boolean
         }
         Relationships: []
       }
@@ -2009,6 +2012,45 @@ export type Database = {
           p_password?: string | null
         }
         Returns: string
+      }
+      list_staff_users: {
+        Args: Record<string, never>
+        Returns: {
+          user_id: string
+          email: string
+          name: string
+          role: StaffRole
+          branch_ids: string[]
+          banned: boolean
+        }[]
+      }
+      create_staff_user: {
+        Args: {
+          p_name: string
+          p_email: string
+          p_password: string
+          p_role: StaffRole
+          p_branch_ids: string[]
+        }
+        Returns: string
+      }
+      update_staff_user: {
+        Args: {
+          p_user_id: string
+          p_name: string
+          p_role: StaffRole
+          p_branch_ids: string[]
+          p_email?: string | null
+          p_password?: string | null
+        }
+        Returns: undefined
+      }
+      set_staff_login_enabled: {
+        Args: {
+          p_user_id: string
+          p_enabled: boolean
+        }
+        Returns: undefined
       }
       create_appointment: {
         Args: {

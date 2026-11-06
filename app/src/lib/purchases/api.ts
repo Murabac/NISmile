@@ -69,6 +69,43 @@ export async function createSupplier(input: {
   return data as Supplier
 }
 
+export async function updateSupplier(
+  id: string,
+  input: {
+    name: string
+    phone?: string | null
+    email?: string | null
+    notes?: string | null
+    active?: boolean
+  },
+) {
+  const { data, error } = await supabase
+    .from('suppliers')
+    .update({
+      name: input.name.trim(),
+      phone: input.phone?.trim() || null,
+      email: input.email?.trim() || null,
+      notes: input.notes?.trim() || null,
+      ...(input.active != null ? { active: input.active } : {}),
+    })
+    .eq('id', id)
+    .select('id, name, phone, email, notes, active')
+    .single()
+  if (error) throw error
+  return data as Supplier
+}
+
+export async function setSupplierActive(id: string, active: boolean) {
+  const { data, error } = await supabase
+    .from('suppliers')
+    .update({ active })
+    .eq('id', id)
+    .select('id, name, phone, email, notes, active')
+    .single()
+  if (error) throw error
+  return data as Supplier
+}
+
 export async function fetchPurchaseOrders(branchId: string) {
   const { data, error } = await supabase
     .from('purchase_orders')

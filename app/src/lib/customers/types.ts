@@ -23,6 +23,7 @@ export type Customer = {
   credit_limit: number | null
   loyalty_points: number
   notes: string | null
+  active: boolean
   created_at: string
   ar_balance?: number
 }
@@ -36,4 +37,5 @@ export type CustomerInput = {
   whatsapp_opt_in: boolean
   credit_limit: number | null
   notes: string | null
+  active?: boolean
 }

@@ -1,20 +1,29 @@
 import { supabase } from '../supabase.ts'
 import type { Customer, CustomerInput } from './types.ts'
 
-export async function fetchCustomers(branchId: string): Promise<Customer[]> {
-  const { data, error } = await supabase
+export async function fetchCustomers(
+  branchId: string,
+  options?: { includeInactive?: boolean },
+): Promise<Customer[]> {
+  let query = supabase
     .from('customers')
     .select(
-      'id, branch_id, name, phone, customer_type, subtype, language, whatsapp_opt_in, credit_limit, loyalty_points, notes, created_at',
+      'id, branch_id, name, phone, customer_type, subtype, language, whatsapp_opt_in, credit_limit, loyalty_points, notes, active, created_at',
     )
     .eq('branch_id', branchId)
     .order('name')
+  if (!options?.includeInactive) query = query.eq('active', true)
+  const { data, error } = await query
   if (error) throw error
 
   const rows = (data ?? []) as Customer[]
   const withBalances = await Promise.all(
     rows.map(async (row) => {
-      const base = { ...row, loyalty_points: Number(row.loyalty_points ?? 0) }
+      const base = {
+        ...row,
+        active: row.active !== false,
+        loyalty_points: Number(row.loyalty_points ?? 0),
+      }
       if (row.customer_type !== 'wholesale') return { ...base, ar_balance: 0 }
       const { data: bal, error: balErr } = await supabase.rpc('customer_ar_balance', {
         p_customer_id: row.id,
@@ -30,7 +39,7 @@ export async function fetchCustomer(id: string): Promise<Customer | null> {
   const { data, error } = await supabase
     .from('customers')
     .select(
-      'id, branch_id, name, phone, customer_type, subtype, language, whatsapp_opt_in, credit_limit, loyalty_points, notes, created_at',
+      'id, branch_id, name, phone, customer_type, subtype, language, whatsapp_opt_in, credit_limit, loyalty_points, notes, active, created_at',
     )
     .eq('id', id)
     .maybeSingle()
@@ -39,6 +48,7 @@ export async function fetchCustomer(id: string): Promise<Customer | null> {
   const { data: bal } = await supabase.rpc('customer_ar_balance', { p_customer_id: id })
   return {
     ...(data as Customer),
+    active: (data as Customer).active !== false,
     loyalty_points: Number((data as Customer).loyalty_points ?? 0),
     ar_balance: Number(bal ?? 0),
   }
@@ -63,6 +73,7 @@ export async function saveCustomer(
         ? Number(input.credit_limit)
         : null,
     notes: input.notes?.trim() ? input.notes.trim() : null,
+    ...(input.active != null ? { active: input.active } : {}),
   }
 
   if (customerId) {
@@ -74,6 +85,11 @@ export async function saveCustomer(
   const { data, error } = await supabase.from('customers').insert(payload).select('id').single()
   if (error) throw error
   return data.id
+}
+
+export async function setCustomerActive(customerId: string, active: boolean): Promise<void> {
+  const { error } = await supabase.from('customers').update({ active }).eq('id', customerId)
+  if (error) throw error
 }
 
 export async function customerArBalance(customerId: string): Promise<number> {

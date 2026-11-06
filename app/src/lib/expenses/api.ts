@@ -1,15 +1,52 @@
 import { supabase } from '../supabase.ts'
 import type { CreateExpenseInput, Expense, ExpenseCategory } from './types.ts'
 
-export async function fetchExpenseCategories() {
-  const { data, error } = await supabase
+export async function fetchExpenseCategories(includeInactive = false) {
+  let query = supabase
     .from('expense_categories')
     .select('id, code, name, active, sort_order')
-    .eq('active', true)
     .order('sort_order')
     .order('name')
+  if (!includeInactive) query = query.eq('active', true)
+  const { data, error } = await query
   if (error) throw error
   return (data ?? []) as ExpenseCategory[]
+}
+
+function slugCode(name: string) {
+  return name
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '_')
+    .replace(/^_|_$/g, '')
+    .slice(0, 40)
+}
+
+export async function createExpenseCategory(name: string) {
+  const trimmed = name.trim()
+  if (!trimmed) throw new Error('Category name is required')
+  const code = slugCode(trimmed) || `cat_${Date.now()}`
+  const { data, error } = await supabase
+    .from('expense_categories')
+    .insert({ code, name: trimmed, active: true, sort_order: 100 })
+    .select('id, code, name, active, sort_order')
+    .single()
+  if (error) throw error
+  return data as ExpenseCategory
+}
+
+export async function updateExpenseCategory(
+  id: string,
+  patch: { name?: string; active?: boolean; sort_order?: number },
+) {
+  const { data, error } = await supabase
+    .from('expense_categories')
+    .update(patch)
+    .eq('id', id)
+    .select('id, code, name, active, sort_order')
+    .single()
+  if (error) throw error
+  return data as ExpenseCategory
 }
 
 export async function fetchExpenses(branchId: string) {

@@ -39,7 +39,7 @@ export function ExpensesPage() {
 
   const categoriesQuery = useQuery({
     queryKey: ['expense_categories'],
-    queryFn: fetchExpenseCategories,
+    queryFn: () => fetchExpenseCategories(false),
     enabled: branchReady,
   })
 

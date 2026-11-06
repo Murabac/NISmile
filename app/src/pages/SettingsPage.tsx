@@ -17,12 +17,34 @@ import {
   updateBranch,
 } from '../lib/branches/api.ts'
 import type { Branch, BranchRegion } from '../lib/branches/types.ts'
+import type { StaffRole } from '../lib/database.types.ts'
+import {
+  createExpenseCategory,
+  fetchExpenseCategories,
+  updateExpenseCategory,
+} from '../lib/expenses/api.ts'
 import { fetchClinicSettings, updateClinicSettings } from '../lib/loyalty/api.ts'
 import { formatTaxPercent, regionLabel } from '../lib/money.ts'
 import { fetchGoLiveStatus, updateGoLiveChecklist } from '../lib/reports/api.ts'
 import type { GoLiveStatus } from '../lib/reports/types.ts'
+import {
+  createStaffUser,
+  listStaffUsers,
+  setStaffLoginEnabled,
+  STAFF_ROLES,
+  updateStaffUser,
+  type StaffUser,
+} from '../lib/staff/api.ts'
 
-type Tab = 'branches' | 'tax' | 'categories' | 'fx' | 'loyalty' | 'golive'
+type Tab =
+  | 'branches'
+  | 'users'
+  | 'tax'
+  | 'categories'
+  | 'expense_categories'
+  | 'fx'
+  | 'loyalty'
+  | 'golive'
 
 export function SettingsPage() {
   const [tab, setTab] = useState<Tab>('tax')
@@ -45,12 +67,25 @@ export function SettingsPage() {
             Branches
           </TabButton>
         ) : null}
+        {isOwner ? (
+          <TabButton active={tab === 'users'} onClick={() => setTab('users')}>
+            Users
+          </TabButton>
+        ) : null}
         <TabButton active={tab === 'tax'} onClick={() => setTab('tax')}>
           Tax rates
         </TabButton>
         <TabButton active={tab === 'categories'} onClick={() => setTab('categories')}>
           Categories
         </TabButton>
+        {isOwner ? (
+          <TabButton
+            active={tab === 'expense_categories'}
+            onClick={() => setTab('expense_categories')}
+          >
+            Expense categories
+          </TabButton>
+        ) : null}
         {isOwner ? (
           <TabButton active={tab === 'fx'} onClick={() => setTab('fx')}>
             Exchange rates
@@ -68,12 +103,305 @@ export function SettingsPage() {
         ) : null}
       </div>
       {tab === 'branches' && isOwner ? <BranchesPanel queryClient={queryClient} /> : null}
+      {tab === 'users' && isOwner ? <UsersPanel queryClient={queryClient} /> : null}
       {tab === 'tax' ? <TaxRatesPanel queryClient={queryClient} /> : null}
       {tab === 'categories' ? <CategoriesPanel queryClient={queryClient} /> : null}
+      {tab === 'expense_categories' && isOwner ? (
+        <ExpenseCategoriesPanel queryClient={queryClient} />
+      ) : null}
       {tab === 'fx' && isOwner ? <FxRatesPanel queryClient={queryClient} /> : null}
       {tab === 'loyalty' && isOwner ? <LoyaltySettingsPanel queryClient={queryClient} /> : null}
       {tab === 'golive' && isOwner ? <GoLivePanel queryClient={queryClient} /> : null}
     </section>
+  )
+}
+
+function UsersPanel({ queryClient }: { queryClient: ReturnType<typeof useQueryClient> }) {
+  const branchesQuery = useQuery({
+    queryKey: ['branches_admin'],
+    queryFn: () => fetchBranches(true),
+  })
+  const staffQuery = useQuery({
+    queryKey: ['staff_users'],
+    queryFn: listStaffUsers,
+  })
+  const [editing, setEditing] = useState<StaffUser | null>(null)
+  const [creating, setCreating] = useState(false)
+  const [name, setName] = useState('')
+  const [email, setEmail] = useState('')
+  const [password, setPassword] = useState('')
+  const [role, setRole] = useState<StaffRole>('receptionist')
+  const [branchIds, setBranchIds] = useState<string[]>([])
+  const [error, setError] = useState<string | null>(null)
+  const [info, setInfo] = useState<string | null>(null)
+
+  const branchMap = new Map((branchesQuery.data ?? []).map((b) => [b.id, b.name]))
+
+  function resetForm() {
+    setName('')
+    setEmail('')
+    setPassword('')
+    setRole('receptionist')
+    setBranchIds([])
+    setEditing(null)
+    setCreating(false)
+  }
+
+  function openCreate() {
+    resetForm()
+    setError(null)
+    setInfo(null)
+    setCreating(true)
+  }
+
+  function openEdit(user: StaffUser) {
+    setCreating(false)
+    setEditing(user)
+    setName(user.name)
+    setEmail(user.email)
+    setPassword('')
+    setRole(user.role)
+    setBranchIds([...user.branch_ids])
+    setError(null)
+    setInfo(null)
+  }
+
+  function toggleBranch(id: string) {
+    setBranchIds((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]))
+  }
+
+  const saveMutation = useMutation({
+    mutationFn: async () => {
+      if (!name.trim()) throw new Error('Name is required.')
+      if (branchIds.length === 0) throw new Error('Select at least one branch.')
+      if (editing) {
+        return updateStaffUser({
+          userId: editing.user_id,
+          name,
+          role,
+          branchIds,
+          email: email.trim() && email.trim() !== editing.email ? email : null,
+          password: password.trim() || null,
+        })
+      }
+      if (!email.trim() || !email.includes('@')) throw new Error('Valid email is required.')
+      if (password.trim().length < 8) throw new Error('Password must be at least 8 characters.')
+      return createStaffUser({ name, email, password, role, branchIds })
+    },
+    onSuccess: async () => {
+      setError(null)
+      setInfo(editing ? 'User updated.' : 'User created.')
+      resetForm()
+      await queryClient.invalidateQueries({ queryKey: ['staff_users'] })
+    },
+    onError: (err: Error) => {
+      setInfo(null)
+      setError(err.message)
+    },
+  })
+
+  const banMutation = useMutation({
+    mutationFn: ({ userId, enabled }: { userId: string; enabled: boolean }) =>
+      setStaffLoginEnabled(userId, enabled),
+    onSuccess: async (_void, vars) => {
+      setError(null)
+      setInfo(vars.enabled ? 'Login enabled.' : 'Login disabled.')
+      await queryClient.invalidateQueries({ queryKey: ['staff_users'] })
+    },
+    onError: (err: Error) => {
+      setInfo(null)
+      setError(err.message)
+    },
+  })
+
+  function onSubmit(event: FormEvent) {
+    event.preventDefault()
+    saveMutation.mutate()
+  }
+
+  const formOpen = creating || editing != null
+  const rows = staffQuery.data ?? []
+
+  return (
+    <div className="space-y-4">
+      <div className="flex flex-wrap items-end justify-between gap-3">
+        <div>
+          <h2 className="font-display text-base font-bold">Staff users</h2>
+          <p className="mt-1 text-xs text-muted">
+            Owner only. Create logins, set role and branch access, or disable a login without
+            deleting history.
+          </p>
+        </div>
+        {!formOpen ? (
+          <button
+            type="button"
+            onClick={openCreate}
+            className="rounded-dentaflow bg-marine px-4 py-2 text-xs font-bold text-white"
+          >
+            Add user
+          </button>
+        ) : null}
+      </div>
+
+      {error ? <p className="text-sm text-status-red">{error}</p> : null}
+      {info ? <p className="text-sm text-status-green">{info}</p> : null}
+
+      {formOpen ? (
+        <form
+          onSubmit={onSubmit}
+          className="space-y-3 rounded-dentaflow border border-line bg-surface p-4"
+        >
+          <h3 className="text-sm font-bold">{editing ? 'Edit user' : 'New user'}</h3>
+          <div className="grid gap-3 md:grid-cols-2">
+            <label className="block text-sm font-semibold md:col-span-2">
+              Name
+              <input
+                required
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                className="mt-1 h-10 w-full rounded-dentaflow border border-line bg-canvas px-3 font-normal"
+              />
+            </label>
+            <label className="block text-sm font-semibold">
+              Email
+              <input
+                required
+                type="email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                className="mt-1 h-10 w-full rounded-dentaflow border border-line bg-canvas px-3 font-normal"
+              />
+            </label>
+            <label className="block text-sm font-semibold">
+              {editing ? 'New password (optional)' : 'Password'}
+              <input
+                required={!editing}
+                type="password"
+                minLength={editing ? undefined : 8}
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                placeholder={editing ? 'Leave blank to keep' : 'Min 8 characters'}
+                className="mt-1 h-10 w-full rounded-dentaflow border border-line bg-canvas px-3 font-normal"
+              />
+            </label>
+            <label className="block text-sm font-semibold md:col-span-2">
+              Role
+              <select
+                value={role}
+                onChange={(e) => setRole(e.target.value as StaffRole)}
+                className="mt-1 h-10 w-full rounded-dentaflow border border-line bg-canvas px-3 font-normal"
+              >
+                {STAFF_ROLES.map((r) => (
+                  <option key={r.value} value={r.value}>
+                    {r.label}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <fieldset className="md:col-span-2">
+              <legend className="text-sm font-semibold">Branches</legend>
+              <div className="mt-2 flex flex-wrap gap-3">
+                {(branchesQuery.data ?? []).map((branch) => (
+                  <label key={branch.id} className="inline-flex items-center gap-2 text-sm">
+                    <input
+                      type="checkbox"
+                      checked={branchIds.includes(branch.id)}
+                      onChange={() => toggleBranch(branch.id)}
+                      className="rounded border-line"
+                    />
+                    {branch.name}
+                    {!branch.active ? ' (inactive)' : ''}
+                  </label>
+                ))}
+              </div>
+            </fieldset>
+          </div>
+          <div className="flex flex-wrap justify-end gap-2">
+            <button
+              type="button"
+              onClick={resetForm}
+              className="rounded-dentaflow border border-line px-4 py-2 text-xs font-bold"
+            >
+              Cancel
+            </button>
+            <button
+              type="submit"
+              disabled={saveMutation.isPending}
+              className="rounded-dentaflow bg-marine px-4 py-2 text-xs font-bold text-white disabled:opacity-60"
+            >
+              {editing ? 'Save changes' : 'Create user'}
+            </button>
+          </div>
+        </form>
+      ) : null}
+
+      <div className="overflow-x-auto rounded-dentaflow border border-line bg-surface">
+        <table className="min-w-full text-left text-sm">
+          <thead className="border-b border-line bg-subtle text-xs tracking-wide text-muted uppercase">
+            <tr>
+              <th className="px-4 py-3 font-semibold">Name</th>
+              <th className="px-4 py-3 font-semibold">Email</th>
+              <th className="px-4 py-3 font-semibold">Role</th>
+              <th className="px-4 py-3 font-semibold">Branches</th>
+              <th className="px-4 py-3 font-semibold">Status</th>
+              <th className="px-4 py-3 font-semibold">Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            {staffQuery.isLoading ? (
+              <tr>
+                <td colSpan={6} className="px-4 py-8 text-muted">
+                  Loading…
+                </td>
+              </tr>
+            ) : rows.length === 0 ? (
+              <tr>
+                <td colSpan={6} className="px-4 py-8 text-muted">
+                  No staff users yet.
+                </td>
+              </tr>
+            ) : (
+              rows.map((user) => (
+                <tr key={user.user_id} className="border-b border-line last:border-0">
+                  <td className="px-4 py-3 font-semibold">{user.name}</td>
+                  <td className="px-4 py-3 text-muted">{user.email}</td>
+                  <td className="px-4 py-3">{STAFF_ROLES.find((r) => r.value === user.role)?.label ?? user.role}</td>
+                  <td className="px-4 py-3 text-xs text-muted">
+                    {user.branch_ids.map((id) => branchMap.get(id) ?? id.slice(0, 8)).join(', ') ||
+                      '—'}
+                  </td>
+                  <td className="px-4 py-3">{user.banned ? 'Disabled' : 'Active'}</td>
+                  <td className="px-4 py-3">
+                    <div className="flex flex-wrap gap-3">
+                      <button
+                        type="button"
+                        onClick={() => openEdit(user)}
+                        className="text-sm font-semibold text-flow-teal"
+                      >
+                        Edit
+                      </button>
+                      <button
+                        type="button"
+                        disabled={banMutation.isPending}
+                        onClick={() =>
+                          banMutation.mutate({
+                            userId: user.user_id,
+                            enabled: user.banned,
+                          })
+                        }
+                        className="text-sm font-semibold text-flow-teal"
+                      >
+                        {user.banned ? 'Enable' : 'Disable'}
+                      </button>
+                    </div>
+                  </td>
+                </tr>
+              ))
+            )}
+          </tbody>
+        </table>
+      </div>
+    </div>
   )
 }
 
@@ -828,6 +1156,7 @@ function TabButton({
 function TaxRatesPanel({ queryClient }: { queryClient: ReturnType<typeof useQueryClient> }) {
   const [name, setName] = useState('')
   const [percent, setPercent] = useState('')
+  const [editingId, setEditingId] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
   const ratesQuery = useQuery({ queryKey: ['tax_rates'], queryFn: () => fetchTaxRates(true) })
 
@@ -836,6 +1165,7 @@ function TaxRatesPanel({ queryClient }: { queryClient: ReturnType<typeof useQuer
     onSuccess: async () => {
       setName('')
       setPercent('')
+      setEditingId(null)
       setError(null)
       await queryClient.invalidateQueries({ queryKey: ['tax_rates'] })
     },
@@ -843,29 +1173,58 @@ function TaxRatesPanel({ queryClient }: { queryClient: ReturnType<typeof useQuer
   })
 
   const updateMutation = useMutation({
-    mutationFn: ({ id, patch }: { id: string; patch: { name?: string; rate?: number; active?: boolean } }) =>
-      updateTaxRate(id, patch),
+    mutationFn: ({
+      id,
+      patch,
+    }: {
+      id: string
+      patch: { name?: string; rate?: number; active?: boolean }
+    }) => updateTaxRate(id, patch),
     onSuccess: async () => {
+      setName('')
+      setPercent('')
+      setEditingId(null)
+      setError(null)
       await queryClient.invalidateQueries({ queryKey: ['tax_rates'] })
     },
     onError: (err: Error) => setError(err.message),
   })
 
-  function onCreate(event: FormEvent) {
+  function startEdit(rate: { id: string; name: string; rate: number }) {
+    setEditingId(rate.id)
+    setName(rate.name)
+    setPercent(String(Number(rate.rate) * 100))
+    setError(null)
+  }
+
+  function cancelEdit() {
+    setEditingId(null)
+    setName('')
+    setPercent('')
+    setError(null)
+  }
+
+  function onSubmit(event: FormEvent) {
     event.preventDefault()
     const rate = Number(percent) / 100
     if (!name.trim() || Number.isNaN(rate) || rate < 0) {
       setError('Enter a name and a percentage at or above 0.')
       return
     }
+    if (editingId) {
+      updateMutation.mutate({ id: editingId, patch: { name: name.trim(), rate } })
+      return
+    }
     createMutation.mutate({ name, rate })
   }
+
+  const busy = createMutation.isPending || updateMutation.isPending
 
   return (
     <div className="space-y-4">
       <form
-        onSubmit={onCreate}
-        className="grid gap-3 rounded-dentaflow border border-line bg-surface p-4 md:grid-cols-[1fr_8rem_auto]"
+        onSubmit={onSubmit}
+        className="grid gap-3 rounded-dentaflow border border-line bg-surface p-4 md:grid-cols-[1fr_8rem_auto_auto]"
       >
         <label className="block text-sm font-semibold">
           Name
@@ -890,13 +1249,22 @@ function TaxRatesPanel({ queryClient }: { queryClient: ReturnType<typeof useQuer
             className="mt-1 h-10 w-full rounded-dentaflow border border-line bg-canvas px-3 font-normal"
           />
         </label>
-        <div className="flex items-end">
+        <div className="flex items-end gap-2">
+          {editingId ? (
+            <button
+              type="button"
+              onClick={cancelEdit}
+              className="h-10 rounded-dentaflow border border-line px-4 text-sm font-semibold"
+            >
+              Cancel
+            </button>
+          ) : null}
           <button
             type="submit"
-            disabled={createMutation.isPending}
+            disabled={busy}
             className="h-10 w-full rounded-dentaflow bg-marine px-4 text-sm font-bold text-white disabled:opacity-60 md:w-auto"
           >
-            Add rate
+            {editingId ? 'Save rate' : 'Add rate'}
           </button>
         </div>
       </form>
@@ -925,16 +1293,25 @@ function TaxRatesPanel({ queryClient }: { queryClient: ReturnType<typeof useQuer
                   <td className="px-4 py-3 font-mono text-xs">{formatTaxPercent(Number(rate.rate))}</td>
                   <td className="px-4 py-3">{rate.active ? 'Active' : 'Inactive'}</td>
                   <td className="px-4 py-3">
-                    <button
-                      type="button"
-                      disabled={updateMutation.isPending}
-                      onClick={() =>
-                        updateMutation.mutate({ id: rate.id, patch: { active: !rate.active } })
-                      }
-                      className="text-sm font-semibold text-flow-teal"
-                    >
-                      {rate.active ? 'Deactivate' : 'Activate'}
-                    </button>
+                    <div className="flex flex-wrap gap-3">
+                      <button
+                        type="button"
+                        onClick={() => startEdit(rate)}
+                        className="text-sm font-semibold text-flow-teal"
+                      >
+                        Edit
+                      </button>
+                      <button
+                        type="button"
+                        disabled={busy}
+                        onClick={() =>
+                          updateMutation.mutate({ id: rate.id, patch: { active: !rate.active } })
+                        }
+                        className="text-sm font-semibold text-flow-teal"
+                      >
+                        {rate.active ? 'Deactivate' : 'Activate'}
+                      </button>
+                    </div>
                   </td>
                 </tr>
               ))
@@ -948,6 +1325,7 @@ function TaxRatesPanel({ queryClient }: { queryClient: ReturnType<typeof useQuer
 
 function CategoriesPanel({ queryClient }: { queryClient: ReturnType<typeof useQueryClient> }) {
   const [name, setName] = useState('')
+  const [editingId, setEditingId] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
   const categoriesQuery = useQuery({
     queryKey: ['categories'],
@@ -958,6 +1336,7 @@ function CategoriesPanel({ queryClient }: { queryClient: ReturnType<typeof useQu
     mutationFn: createCategory,
     onSuccess: async () => {
       setName('')
+      setEditingId(null)
       setError(null)
       await queryClient.invalidateQueries({ queryKey: ['categories'] })
     },
@@ -968,24 +1347,45 @@ function CategoriesPanel({ queryClient }: { queryClient: ReturnType<typeof useQu
     mutationFn: ({ id, patch }: { id: string; patch: { name?: string; active?: boolean } }) =>
       updateCategory(id, patch),
     onSuccess: async () => {
+      setName('')
+      setEditingId(null)
+      setError(null)
       await queryClient.invalidateQueries({ queryKey: ['categories'] })
     },
     onError: (err: Error) => setError(err.message),
   })
 
-  function onCreate(event: FormEvent) {
+  function startEdit(category: { id: string; name: string }) {
+    setEditingId(category.id)
+    setName(category.name)
+    setError(null)
+  }
+
+  function cancelEdit() {
+    setEditingId(null)
+    setName('')
+    setError(null)
+  }
+
+  function onSubmit(event: FormEvent) {
     event.preventDefault()
     if (!name.trim()) {
       setError('Enter a category name.')
       return
     }
+    if (editingId) {
+      updateMutation.mutate({ id: editingId, patch: { name: name.trim() } })
+      return
+    }
     createMutation.mutate(name)
   }
+
+  const busy = createMutation.isPending || updateMutation.isPending
 
   return (
     <div className="space-y-4">
       <form
-        onSubmit={onCreate}
+        onSubmit={onSubmit}
         className="flex flex-wrap items-end gap-3 rounded-dentaflow border border-line bg-surface p-4"
       >
         <label className="block min-w-[220px] flex-1 text-sm font-semibold">
@@ -994,16 +1394,25 @@ function CategoriesPanel({ queryClient }: { queryClient: ReturnType<typeof useQu
             required
             value={name}
             onChange={(event) => setName(event.target.value)}
-            placeholder="New category"
+            placeholder={editingId ? 'Rename category' : 'New category'}
             className="mt-1 h-10 w-full rounded-dentaflow border border-line bg-canvas px-3 font-normal"
           />
         </label>
+        {editingId ? (
+          <button
+            type="button"
+            onClick={cancelEdit}
+            className="h-10 rounded-dentaflow border border-line px-4 text-sm font-semibold"
+          >
+            Cancel
+          </button>
+        ) : null}
         <button
           type="submit"
-          disabled={createMutation.isPending}
+          disabled={busy}
           className="h-10 rounded-dentaflow bg-marine px-4 text-sm font-bold text-white disabled:opacity-60"
         >
-          Add category
+          {editingId ? 'Save name' : 'Add category'}
         </button>
       </form>
       {error ? <p className="text-sm text-status-red">{error}</p> : null}
@@ -1022,19 +1431,179 @@ function CategoriesPanel({ queryClient }: { queryClient: ReturnType<typeof useQu
                 <td className="px-4 py-3 font-semibold">{category.name}</td>
                 <td className="px-4 py-3">{category.active ? 'Active' : 'Inactive'}</td>
                 <td className="px-4 py-3">
-                  <button
-                    type="button"
-                    disabled={updateMutation.isPending}
-                    onClick={() =>
-                      updateMutation.mutate({
-                        id: category.id,
-                        patch: { active: !category.active },
-                      })
-                    }
-                    className="text-sm font-semibold text-flow-teal"
-                  >
-                    {category.active ? 'Deactivate' : 'Activate'}
-                  </button>
+                  <div className="flex flex-wrap gap-3">
+                    <button
+                      type="button"
+                      onClick={() => startEdit(category)}
+                      className="text-sm font-semibold text-flow-teal"
+                    >
+                      Rename
+                    </button>
+                    <button
+                      type="button"
+                      disabled={busy}
+                      onClick={() =>
+                        updateMutation.mutate({
+                          id: category.id,
+                          patch: { active: !category.active },
+                        })
+                      }
+                      className="text-sm font-semibold text-flow-teal"
+                    >
+                      {category.active ? 'Deactivate' : 'Activate'}
+                    </button>
+                  </div>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  )
+}
+
+function ExpenseCategoriesPanel({ queryClient }: { queryClient: ReturnType<typeof useQueryClient> }) {
+  const [name, setName] = useState('')
+  const [editingId, setEditingId] = useState<string | null>(null)
+  const [error, setError] = useState<string | null>(null)
+  const categoriesQuery = useQuery({
+    queryKey: ['expense_categories'],
+    queryFn: () => fetchExpenseCategories(true),
+  })
+
+  const createMutation = useMutation({
+    mutationFn: createExpenseCategory,
+    onSuccess: async () => {
+      setName('')
+      setEditingId(null)
+      setError(null)
+      await queryClient.invalidateQueries({ queryKey: ['expense_categories'] })
+    },
+    onError: (err: Error) => setError(err.message),
+  })
+
+  const updateMutation = useMutation({
+    mutationFn: ({
+      id,
+      patch,
+    }: {
+      id: string
+      patch: { name?: string; active?: boolean }
+    }) => updateExpenseCategory(id, patch),
+    onSuccess: async () => {
+      setName('')
+      setEditingId(null)
+      setError(null)
+      await queryClient.invalidateQueries({ queryKey: ['expense_categories'] })
+    },
+    onError: (err: Error) => setError(err.message),
+  })
+
+  function startEdit(category: { id: string; name: string }) {
+    setEditingId(category.id)
+    setName(category.name)
+    setError(null)
+  }
+
+  function cancelEdit() {
+    setEditingId(null)
+    setName('')
+    setError(null)
+  }
+
+  function onSubmit(event: FormEvent) {
+    event.preventDefault()
+    if (!name.trim()) {
+      setError('Enter a category name.')
+      return
+    }
+    if (editingId) {
+      updateMutation.mutate({ id: editingId, patch: { name: name.trim() } })
+      return
+    }
+    createMutation.mutate(name)
+  }
+
+  const busy = createMutation.isPending || updateMutation.isPending
+
+  return (
+    <div className="space-y-4">
+      <div>
+        <h2 className="font-display text-base font-bold">Expense categories</h2>
+        <p className="mt-1 text-xs text-muted">Shared across branches. Used when posting expenses.</p>
+      </div>
+      <form
+        onSubmit={onSubmit}
+        className="flex flex-wrap items-end gap-3 rounded-dentaflow border border-line bg-surface p-4"
+      >
+        <label className="block min-w-[220px] flex-1 text-sm font-semibold">
+          Name
+          <input
+            required
+            value={name}
+            onChange={(event) => setName(event.target.value)}
+            placeholder={editingId ? 'Rename category' : 'New expense category'}
+            className="mt-1 h-10 w-full rounded-dentaflow border border-line bg-canvas px-3 font-normal"
+          />
+        </label>
+        {editingId ? (
+          <button
+            type="button"
+            onClick={cancelEdit}
+            className="h-10 rounded-dentaflow border border-line px-4 text-sm font-semibold"
+          >
+            Cancel
+          </button>
+        ) : null}
+        <button
+          type="submit"
+          disabled={busy}
+          className="h-10 rounded-dentaflow bg-marine px-4 text-sm font-bold text-white disabled:opacity-60"
+        >
+          {editingId ? 'Save name' : 'Add category'}
+        </button>
+      </form>
+      {error ? <p className="text-sm text-status-red">{error}</p> : null}
+      <div className="overflow-x-auto rounded-dentaflow border border-line bg-surface">
+        <table className="min-w-full text-left text-sm">
+          <thead className="border-b border-line bg-subtle text-xs tracking-wide text-muted uppercase">
+            <tr>
+              <th className="px-4 py-3 font-semibold">Code</th>
+              <th className="px-4 py-3 font-semibold">Name</th>
+              <th className="px-4 py-3 font-semibold">Status</th>
+              <th className="px-4 py-3 font-semibold">Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            {(categoriesQuery.data ?? []).map((category) => (
+              <tr key={category.id} className="border-b border-line last:border-0">
+                <td className="px-4 py-3 font-mono text-xs">{category.code}</td>
+                <td className="px-4 py-3 font-semibold">{category.name}</td>
+                <td className="px-4 py-3">{category.active ? 'Active' : 'Inactive'}</td>
+                <td className="px-4 py-3">
+                  <div className="flex flex-wrap gap-3">
+                    <button
+                      type="button"
+                      onClick={() => startEdit(category)}
+                      className="text-sm font-semibold text-flow-teal"
+                    >
+                      Rename
+                    </button>
+                    <button
+                      type="button"
+                      disabled={busy}
+                      onClick={() =>
+                        updateMutation.mutate({
+                          id: category.id,
+                          patch: { active: !category.active },
+                        })
+                      }
+                      className="text-sm font-semibold text-flow-teal"
+                    >
+                      {category.active ? 'Deactivate' : 'Activate'}
+                    </button>
+                  </div>
                 </td>
               </tr>
             ))}

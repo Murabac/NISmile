@@ -2,7 +2,7 @@
 
 This file is the map for building DentaFlow. The product spec is `DentaFlow-Project-Plan-v2.md`. The look and screen behavior come from `Design Ref/`. Logos live in `Brand/`.
 
-**Current step:** Apply migration `20261017150000_dental_branch_region_fx.sql`, then set FX rates in Settings and redeploy `send-whatsapp` if using sale PDFs. Step **38** branch regions + SLSH/ETB display done in code. WhatsApp **36/37** still open (Meta token / production number). Do not invent VAT, loyalty, FX rates, MyCash, or WhatsApp tokens.
+**Current step:** Apply migration `20261018120000_dental_staff_admin_crud.sql` on remote (staff RPCs, `customers.active`, expense category grants). Owner manages staff in Settings → Users. WhatsApp **36/37** still open. Do not invent VAT, loyalty, FX rates, MyCash, or WhatsApp tokens.
 
 ## What this repo is
 

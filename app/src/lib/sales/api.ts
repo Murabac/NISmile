@@ -28,6 +28,7 @@ export async function fetchBranchCustomers(branchId: string): Promise<PosCustome
     .from('customers')
     .select('id, name, phone, customer_type, credit_limit, subtype, loyalty_points')
     .eq('branch_id', branchId)
+    .eq('active', true)
     .order('name')
   if (error) throw error
   return (data ?? []).map((row) => ({
