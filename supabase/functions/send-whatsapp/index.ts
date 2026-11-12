@@ -10,7 +10,8 @@
  *
  * POST JSON (optional): { "limit": 10, "queue_id": "<uuid>" }
  * Approved Meta template names in message_templates.whatsapp_template_id use
- * the template API (en_US). Otherwise free-form text (24h customer window).
+ * the template API (language from WHATSAPP_TEMPLATE_LANGUAGE, default en).
+ * Otherwise free-form text (24h customer window).
  * Sale receipt/invoice notices also attach an English A4 PDF document.
  */
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.49.1'
@@ -92,7 +93,10 @@ async function sendCloudMessage(input: {
       type: 'template',
       template: {
         name: input.templateName,
-        language: { code: 'en_US' },
+        // This WABA's approved templates use language code "en" (not en_US).
+        language: {
+          code: Deno.env.get('WHATSAPP_TEMPLATE_LANGUAGE') || 'en',
+        },
         components:
           parameters.length > 0 && input.templateName !== 'hello_world'
             ? [{ type: 'body', parameters }]

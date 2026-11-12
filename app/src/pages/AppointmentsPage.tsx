@@ -886,7 +886,8 @@ export function AppointmentsPage() {
                       setWaNotice(null)
                       waMutation.mutate({
                         appointmentId: selected.id,
-                        kind: 'appointment_reminder_24h',
+                        // Meta has nis_appointment_reminder_2h_en approved; 24h template name is not on this WABA yet.
+                        kind: 'appointment_reminder_2h',
                       })
                     }}
                     className="inline-flex h-9 flex-1 items-center justify-center gap-1.5 rounded-dentaflow border border-line px-3 text-xs font-bold disabled:opacity-60"

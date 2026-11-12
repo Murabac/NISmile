@@ -225,7 +225,7 @@ export async function sendWhatsAppNow(
     return {
       skipped: true,
       reason:
-        'Nothing queued — walk-in, opted out, missing phone, or this sale was already sent.',
+        'Nothing queued — missing/opted-out phone, closed visit, or this notice was already sent today.',
     }
   }
   const send = await processWhatsAppQueue({ limit: 1, queueId })
