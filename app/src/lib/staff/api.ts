@@ -5,6 +5,8 @@ export type StaffUser = {
   user_id: string
   email: string
   name: string
+  /** Name patients see as "Dentist" on WhatsApp (blank = own name for dentists, team for others). */
+  display_name: string | null
   role: StaffRole
   branch_ids: string[]
   banned: boolean
@@ -25,6 +27,7 @@ export async function listStaffUsers(): Promise<StaffUser[]> {
     user_id: row.user_id,
     email: row.email,
     name: row.name,
+    display_name: row.display_name ?? null,
     role: row.role,
     branch_ids: row.branch_ids ?? [],
     banned: Boolean(row.banned),
@@ -64,6 +67,14 @@ export async function updateStaffUser(input: {
     p_branch_ids: input.branchIds,
     p_email: input.email?.trim() ? input.email.trim() : null,
     p_password: input.password?.trim() ? input.password : null,
+  })
+  if (error) throw error
+}
+
+export async function setStaffDisplayName(userId: string, displayName: string): Promise<void> {
+  const { error } = await supabase.rpc('set_staff_display_name', {
+    p_user_id: userId,
+    p_display_name: displayName.trim(),
   })
   if (error) throw error
 }

@@ -55,18 +55,18 @@ export type NotificationLogItem = {
 }
 
 export const KIND_LABELS: Record<string, string> = {
-  appointment_confirmation: 'Appointment confirmation',
-  appointment_reminder_24h: 'Reminder (24h)',
-  appointment_reminder_2h: 'Reminder (2h)',
-  appointment_reschedule: 'Reschedule notice',
-  appointment_cancel: 'Cancel notice',
-  appointment_reply_confirmed: 'Reply ack — confirmed',
-  appointment_reply_cancelled: 'Reply ack — cancelled',
-  receipt_notice: 'Receipt notice',
-  invoice_notice: 'Invoice notice',
-  payment_due_reminder: 'Payment due reminder',
-  promotion_announcement: 'Promotion announcement',
-  promotion_ending_soon: 'Promotion ending soon',
+  appointment_confirmation: 'Confirm a booked appointment',
+  appointment_reminder_24h: 'Remind the patient the day before',
+  appointment_reminder_2h: 'Remind the patient 2 hours before',
+  appointment_reschedule: 'Tell the patient the appointment moved',
+  appointment_cancel: 'Tell the patient the appointment was cancelled',
+  appointment_reply_confirmed: 'Reply when the patient confirms',
+  appointment_reply_cancelled: 'Reply when the patient cancels',
+  receipt_notice: 'Send the receipt after a purchase',
+  invoice_notice: 'Send the invoice after a wholesale sale',
+  payment_due_reminder: 'Remind the customer about an unpaid balance',
+  promotion_announcement: 'Announce a promotion',
+  promotion_ending_soon: 'Tell customers a promotion is ending',
 }
 
 export const QUEUE_STATUS_LABELS: Record<QueueStatus, string> = {

@@ -388,7 +388,7 @@ export function WhatsAppPage() {
             <table className="w-full text-left text-sm">
               <thead className="border-b border-line bg-canvas text-[10px] tracking-wide text-muted uppercase">
                 <tr>
-                  <th className="px-4 py-3 font-semibold">Kind</th>
+                  <th className="px-4 py-3 font-semibold">What it sends</th>
                   <th className="px-4 py-3 font-semibold">Category</th>
                   <th className="px-4 py-3 font-semibold">Meta status</th>
                   <th className="px-4 py-3 text-end font-semibold">Actions</th>
@@ -402,7 +402,6 @@ export function WhatsAppPage() {
                     <tr key={kind} className="border-b border-line last:border-0">
                       <td className="px-4 py-3">
                         <p className="font-semibold">{KIND_LABELS[kind] ?? kind}</p>
-                        <p className="font-mono text-[11px] text-muted">{kind}</p>
                       </td>
                       <td className="px-4 py-3 capitalize text-xs text-muted">
                         {en?.category}
@@ -414,11 +413,12 @@ export function WhatsAppPage() {
                           {en?.status}
                         </span>
                         {en?.whatsapp_template_id ? (
-                          <p className="mt-1 font-mono text-[10px] text-muted">
-                            {en.whatsapp_template_id}
+                          <p className="mt-1 text-[10px] text-muted">
+                            WhatsApp name{' '}
+                            <span className="font-mono">{en.whatsapp_template_id}</span>
                           </p>
                         ) : (
-                          <p className="mt-1 text-[10px] text-muted">No Meta template name yet</p>
+                          <p className="mt-1 text-[10px] text-muted">No WhatsApp name yet</p>
                         )}
                       </td>
                       <td className="px-4 py-3 text-end">
@@ -460,7 +460,7 @@ export function WhatsAppPage() {
                 <tr>
                   <th className="px-4 py-3 font-semibold">Scheduled</th>
                   <th className="px-4 py-3 font-semibold">Recipient</th>
-                  <th className="px-4 py-3 font-semibold">Kind</th>
+                  <th className="px-4 py-3 font-semibold">Message</th>
                   <th className="px-4 py-3 font-semibold">Status</th>
                   <th className="px-4 py-3 text-end font-semibold">Actions</th>
                 </tr>
@@ -580,7 +580,7 @@ export function WhatsAppPage() {
                   <th className="px-4 py-3 font-semibold">When</th>
                   <th className="px-4 py-3 font-semibold">Direction</th>
                   <th className="px-4 py-3 font-semibold">Phone</th>
-                  <th className="px-4 py-3 font-semibold">Kind</th>
+                  <th className="px-4 py-3 font-semibold">Message</th>
                   <th className="px-4 py-3 font-semibold">Status</th>
                   <th className="px-4 py-3 font-semibold">Preview</th>
                 </tr>
@@ -620,7 +620,7 @@ export function WhatsAppPage() {
         title={canEditTemplates ? 'Edit WhatsApp template' : 'WhatsApp template'}
         subtitle={
           editing
-            ? `${KIND_LABELS[editing.kind] ?? editing.kind} · English · Meta en_US`
+            ? `${KIND_LABELS[editing.kind] ?? editing.kind} · English`
             : undefined
         }
         footer={

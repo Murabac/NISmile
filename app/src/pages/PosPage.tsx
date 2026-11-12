@@ -64,6 +64,32 @@ const emptyTenders = (): TenderDraft => ({
   mycash: '',
 })
 
+function phoneDigits(value: string): string {
+  return value.replace(/\D/g, '')
+}
+
+/** Match a stored phone even if the cashier types spaces, +252, or only the local number. */
+function phoneMatches(phone: string | null, query: string): boolean {
+  const queryDigits = phoneDigits(query)
+  if (queryDigits.length < 3 || !phone) return false
+  const stored = phoneDigits(phone)
+  if (!stored) return false
+  if (stored.includes(queryDigits)) return true
+  const local = stored.replace(/^252/, '').replace(/^0+/, '')
+  const typed = queryDigits.replace(/^252/, '').replace(/^0+/, '')
+  return typed.length >= 3 && local.includes(typed)
+}
+
+function customerMatchesQuery(
+  customer: { name: string; phone: string | null },
+  query: string,
+): boolean {
+  const q = query.trim().toLowerCase()
+  if (!q) return true
+  if (customer.name.toLowerCase().includes(q)) return true
+  return phoneMatches(customer.phone, q)
+}
+
 export function PosPage() {
   const { branchId, branches } = useAuth()
   const queryClient = useQueryClient()
@@ -74,6 +100,10 @@ export function PosPage() {
   const [search, setSearch] = useState('')
   const [categoryId, setCategoryId] = useState('all')
   const [customerId, setCustomerIdState] = useState<string>('walk-in')
+  const [customerQuery, setCustomerQuery] = useState('')
+  const [customerOpen, setCustomerOpen] = useState(false)
+  const [customerHighlight, setCustomerHighlight] = useState(0)
+  const customerBoxRef = useRef<HTMLDivElement>(null)
   const [cart, setCart] = useState<CartLine[]>([])
   const [tenders, setTenders] = useState<TenderDraft>(emptyTenders)
   const [foreignPay, setForeignPay] = useState('')
@@ -95,6 +125,18 @@ export function PosPage() {
   function setCustomerId(id: string) {
     setCustomerIdState(id)
     setRedeemLoyalty(false)
+  }
+
+  function chooseCustomer(id: string) {
+    if (id !== customerId) {
+      setCustomerId(id)
+      setCart([])
+      setLastSale(null)
+      setChargeToAccount(false)
+      setDueDate(defaultDueDate())
+    }
+    setCustomerQuery('')
+    setCustomerOpen(false)
   }
 
   const branchReady = branchId !== 'all'
@@ -128,6 +170,22 @@ export function PosPage() {
   const items = (itemsQuery.data ?? []).filter((row) => row.active) as CatalogItem[]
   const services = (servicesQuery.data ?? []).filter((row) => row.active) as CatalogService[]
   const customers = customersQuery.data ?? []
+  const customerChoices = useMemo(() => {
+    const q = customerQuery.trim().toLowerCase()
+    const showWalkIn = !q || 'walk-in'.startsWith(q) || 'walk in'.startsWith(q)
+    const matched = customers
+      .filter((customer) => customerMatchesQuery(customer, customerQuery))
+      .slice(0, 12)
+    return {
+      showWalkIn,
+      matched,
+      count: (showWalkIn ? 1 : 0) + matched.length,
+    }
+  }, [customers, customerQuery])
+
+  useEffect(() => {
+    setCustomerHighlight(0)
+  }, [customerQuery])
   const stockByItem = useMemo(() => {
     const map = new Map<string, number>()
     for (const row of stockQuery.data ?? []) map.set(row.item_id, row.qty_on_hand)
@@ -899,26 +957,131 @@ export function PosPage() {
               <User className="h-3.5 w-3.5 text-flow-teal" />
               Customer
             </label>
-            <select
-              value={customerId}
-              onChange={(event) => {
-                setCustomerId(event.target.value)
-                setCart([])
-                setLastSale(null)
-                setChargeToAccount(false)
-                setDueDate(defaultDueDate())
-              }}
-              className="h-10 w-full rounded-dentaflow border border-line bg-canvas px-3 text-sm"
-            >
-              <option value="walk-in">Walk-in (retail)</option>
-              {customers.map((customer) => (
-                <option key={customer.id} value={customer.id}>
-                  {customer.name}
-                  {customer.customer_type === 'wholesale' ? ' · Wholesale' : ''}
-                  {customer.phone ? ` · ${customer.phone}` : ''}
-                </option>
-              ))}
-            </select>
+            <div ref={customerBoxRef} className="relative">
+              <input
+                role="combobox"
+                aria-expanded={customerOpen}
+                aria-controls="pos-customer-list"
+                aria-autocomplete="list"
+                value={
+                  customerOpen
+                    ? customerQuery
+                    : customerId === 'walk-in'
+                      ? ''
+                      : [
+                          selectedCustomer?.name,
+                          selectedCustomer?.phone,
+                        ]
+                          .filter(Boolean)
+                          .join(' · ')
+                }
+                placeholder={
+                  customerId === 'walk-in'
+                    ? 'Walk-in, or search name / phone'
+                    : 'Search name or phone'
+                }
+                onChange={(event) => {
+                  setCustomerQuery(event.target.value)
+                  setCustomerOpen(true)
+                }}
+                onFocus={() => {
+                  setCustomerQuery('')
+                  setCustomerOpen(true)
+                }}
+                onBlur={() => {
+                  window.setTimeout(() => setCustomerOpen(false), 120)
+                }}
+                onKeyDown={(event) => {
+                  if (!customerOpen && (event.key === 'ArrowDown' || event.key === 'Enter')) {
+                    setCustomerOpen(true)
+                    return
+                  }
+                  if (event.key === 'Escape') {
+                    setCustomerOpen(false)
+                    return
+                  }
+                  if (event.key === 'ArrowDown') {
+                    event.preventDefault()
+                    setCustomerHighlight((index) =>
+                      Math.min(index + 1, Math.max(customerChoices.count - 1, 0)),
+                    )
+                  } else if (event.key === 'ArrowUp') {
+                    event.preventDefault()
+                    setCustomerHighlight((index) => Math.max(index - 1, 0))
+                  } else if (event.key === 'Enter' && customerOpen) {
+                    event.preventDefault()
+                    const index = customerChoices.showWalkIn
+                      ? customerHighlight - 1
+                      : customerHighlight
+                    if (customerChoices.showWalkIn && customerHighlight === 0) {
+                      chooseCustomer('walk-in')
+                    } else if (customerChoices.matched[index]) {
+                      chooseCustomer(customerChoices.matched[index].id)
+                    }
+                  }
+                }}
+                className="h-10 w-full rounded-dentaflow border border-line bg-canvas px-3 text-sm"
+              />
+              {customerOpen ? (
+                <ul
+                  id="pos-customer-list"
+                  role="listbox"
+                  className="absolute z-20 mt-1 max-h-64 w-full overflow-auto rounded-dentaflow border border-line bg-surface py-1 shadow-lg"
+                >
+                  {customerChoices.showWalkIn ? (
+                    <li>
+                      <button
+                        type="button"
+                        role="option"
+                        aria-selected={customerId === 'walk-in'}
+                        onMouseDown={(event) => event.preventDefault()}
+                        onClick={() => chooseCustomer('walk-in')}
+                        className={`flex w-full px-3 py-2 text-start text-sm ${
+                          customerHighlight === 0 ? 'bg-canvas' : ''
+                        }`}
+                      >
+                        Walk-in (retail)
+                      </button>
+                    </li>
+                  ) : null}
+                  {customerChoices.matched.map((customer, index) => {
+                    const optionIndex = index + (customerChoices.showWalkIn ? 1 : 0)
+                    const queryHasDigits = phoneDigits(customerQuery).length >= 3
+                    return (
+                      <li key={customer.id}>
+                        <button
+                          type="button"
+                          role="option"
+                          aria-selected={customer.id === customerId}
+                          onMouseDown={(event) => event.preventDefault()}
+                          onClick={() => chooseCustomer(customer.id)}
+                          className={`flex w-full items-baseline justify-between gap-3 px-3 py-2 text-start ${
+                            customerHighlight === optionIndex ? 'bg-canvas' : ''
+                          }`}
+                        >
+                          <span className="min-w-0">
+                            <span className="block truncate text-sm font-semibold">
+                              {queryHasDigits && customer.phone ? customer.phone : customer.name}
+                            </span>
+                            <span className="block truncate text-[11px] text-muted">
+                              {queryHasDigits && customer.phone
+                                ? customer.name
+                                : customer.phone || 'No phone'}
+                              {customer.customer_type === 'wholesale' ? ' · Wholesale' : ''}
+                            </span>
+                          </span>
+                        </button>
+                      </li>
+                    )
+                  })}
+                  {customerChoices.count === 0 ? (
+                    <li className="px-3 py-2 text-xs text-muted">
+                      No customer with that name or phone.
+                    </li>
+                  ) : null}
+                </ul>
+              ) : null}
+            </div>
             <p className="text-[11px] text-muted">
               Price list: {priceList === 'wholesale' ? 'Wholesale items' : 'Retail'}
               {priceList === 'wholesale' ? ' · services stay patient-priced' : ''}

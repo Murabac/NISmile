@@ -229,3 +229,10 @@ These do not block the app skeleton.
 4. **FX rates (SLSH / ETB per USD).** Settings → Exchange rates — blank until clinic confirms. Do not invent.
 5. **MyCash account number.** Documents show “Pending” until the clinic has one.
 6. **Meta Cloud API.** Step 37: second API number + `WHATSAPP_*` secrets after M2B Verified. Do not invent tokens or phone number id.
+
+## Step 39 - WhatsApp message polish
+
+- Migration `20261112100000_whatsapp_message_polish.sql`: first-name, friendly date and 12h time helpers, real dentist name (`profiles.display_name`, `set_staff_display_name`, fallback "Our dental team"), time-aware reminders (24h wording chosen at send time; 2h skipped when booked under 2h ahead or already confirmed), and all 12 `message_templates` rewritten with one layout and the contact line `https://wa.me/252634548732`.
+- `send-whatsapp`: image header for template names ending `_v2` (`app/public/whatsapp-header.jpg`), param cleaning. Shared footer in `whatsapp_care_footer.ts` / `whatsappCare.ts`.
+- App: Settings > Users has "Name shown to patients"; reminder button now sends `appointment_reminder_24h`.
+- Meta submission sheet: `docs/WhatsApp-Templates-v2.md`. Old approved templates stay until the `_v2` ones are approved.

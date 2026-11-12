@@ -13,6 +13,10 @@
  * the template API (language from WHATSAPP_TEMPLATE_LANGUAGE, default en).
  * Otherwise free-form text (24h customer window).
  * Sale receipt/invoice notices also attach an English A4 PDF document.
+ *
+ * Templates named *_v2 carry the N.I SMILE logo as an image header. The image must be
+ * publicly reachable: WHATSAPP_HEADER_IMAGE_URL (optional, default is the app's
+ * /whatsapp-header.jpg).
  */
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.49.1'
 import { appendCareFooter } from '../_shared/whatsapp_care_footer.ts'
@@ -63,6 +67,23 @@ function digitsOnlyPhone(phone: string): string {
   return phone.replace(/[^\d]/g, '')
 }
 
+const DEFAULT_HEADER_IMAGE_URL = 'https://nismile.m2btek.com/whatsapp-header.jpg'
+
+/** v2 templates are submitted to Meta with a logo image header; older ones have none. */
+function headerImageFor(templateName: string | null): string | null {
+  if (!templateName || !/_v2$/i.test(templateName)) return null
+  return Deno.env.get('WHATSAPP_HEADER_IMAGE_URL') || DEFAULT_HEADER_IMAGE_URL
+}
+
+/** Meta rejects empty values, newlines, tabs and runs of 4+ spaces inside a template value. */
+function cleanTemplateParam(value: unknown): string {
+  const text = String(value ?? '')
+    .replace(/[\r\n\t]+/g, ' ')
+    .replace(/ {4,}/g, '   ')
+    .trim()
+  return text || '-'
+}
+
 async function sendCloudMessage(input: {
   token: string
   phoneNumberId: string
@@ -72,6 +93,7 @@ async function sendCloudMessage(input: {
   templateName: string | null
   language: string
   params: Record<string, unknown>
+  headerImageUrl?: string | null
 }): Promise<{ id: string; raw: unknown }> {
   const url =
     `https://graph.facebook.com/${input.graphVersion}/` +
@@ -85,8 +107,18 @@ async function sendCloudMessage(input: {
       .sort((a, b) => Number(a) - Number(b))
     const parameters = keys.map((k) => ({
       type: 'text',
-      text: String(input.params[k] ?? ''),
+      text: cleanTemplateParam(input.params[k]),
     }))
+    const components: Record<string, unknown>[] = []
+    if (input.headerImageUrl) {
+      components.push({
+        type: 'header',
+        parameters: [{ type: 'image', image: { link: input.headerImageUrl } }],
+      })
+    }
+    if (parameters.length > 0 && input.templateName !== 'hello_world') {
+      components.push({ type: 'body', parameters })
+    }
     payload = {
       messaging_product: 'whatsapp',
       to: input.to,
@@ -97,10 +129,7 @@ async function sendCloudMessage(input: {
         language: {
           code: Deno.env.get('WHATSAPP_TEMPLATE_LANGUAGE') || 'en',
         },
-        components:
-          parameters.length > 0 && input.templateName !== 'hello_world'
-            ? [{ type: 'body', parameters }]
-            : undefined,
+        components: components.length > 0 ? components : undefined,
       },
     }
   } else {
@@ -391,6 +420,7 @@ Deno.serve(async (req) => {
           templateName: approvedName,
           language: row.language,
           params: row.params ?? {},
+          headerImageUrl: headerImageFor(approvedName),
         })
       } catch (textErr) {
         if (approvedName) throw textErr
@@ -440,10 +470,12 @@ Deno.serve(async (req) => {
             to,
             mediaId,
             filename: pdf.filename,
-            caption:
+            caption: appendCareFooter(
               row.kind === 'invoice_notice'
                 ? 'Your N.I SMILE tax invoice (PDF)'
                 : 'Your N.I SMILE receipt (PDF)',
+              1024,
+            ),
           })
           pdfPayload = {
             media_id: mediaId,

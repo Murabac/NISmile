@@ -57,3 +57,5 @@ Apply staff-admin migration on remote, then smoke-test Settings → Users (creat
 **36** — docs / e2e checklist against Meta test number; then **37** production API number.
 
 Update this file when you finish a chunk of work on either machine.
+
+**39** - WhatsApp message polish done (migration 20261112100000, send-whatsapp, Settings display name). Next: apply migration, deploy, submit `_v2` templates (docs/WhatsApp-Templates-v2.md).

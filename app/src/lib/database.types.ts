@@ -109,17 +109,20 @@ export type Database = {
           user_id: string
           role: StaffRole
           name: string
+          display_name: string | null
           created_at: string
         }
         Insert: {
           user_id: string
           role: StaffRole
           name: string
+          display_name?: string | null
           created_at?: string
         }
         Update: {
           role?: StaffRole
           name?: string
+          display_name?: string | null
         }
         Relationships: []
       }
@@ -2019,6 +2022,7 @@ export type Database = {
           user_id: string
           email: string
           name: string
+          display_name: string | null
           role: StaffRole
           branch_ids: string[]
           banned: boolean
@@ -2042,6 +2046,13 @@ export type Database = {
           p_branch_ids: string[]
           p_email?: string | null
           p_password?: string | null
+        }
+        Returns: undefined
+      }
+      set_staff_display_name: {
+        Args: {
+          p_user_id: string
+          p_display_name: string
         }
         Returns: undefined
       }

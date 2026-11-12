@@ -30,6 +30,7 @@ import type { GoLiveStatus } from '../lib/reports/types.ts'
 import {
   createStaffUser,
   listStaffUsers,
+  setStaffDisplayName,
   setStaffLoginEnabled,
   STAFF_ROLES,
   updateStaffUser,
@@ -128,6 +129,7 @@ function UsersPanel({ queryClient }: { queryClient: ReturnType<typeof useQueryCl
   const [editing, setEditing] = useState<StaffUser | null>(null)
   const [creating, setCreating] = useState(false)
   const [name, setName] = useState('')
+  const [displayName, setDisplayName] = useState('')
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [role, setRole] = useState<StaffRole>('receptionist')
@@ -139,6 +141,7 @@ function UsersPanel({ queryClient }: { queryClient: ReturnType<typeof useQueryCl
 
   function resetForm() {
     setName('')
+    setDisplayName('')
     setEmail('')
     setPassword('')
     setRole('receptionist')
@@ -158,6 +161,7 @@ function UsersPanel({ queryClient }: { queryClient: ReturnType<typeof useQueryCl
     setCreating(false)
     setEditing(user)
     setName(user.name)
+    setDisplayName(user.display_name ?? '')
     setEmail(user.email)
     setPassword('')
     setRole(user.role)
@@ -175,7 +179,7 @@ function UsersPanel({ queryClient }: { queryClient: ReturnType<typeof useQueryCl
       if (!name.trim()) throw new Error('Name is required.')
       if (branchIds.length === 0) throw new Error('Select at least one branch.')
       if (editing) {
-        return updateStaffUser({
+        await updateStaffUser({
           userId: editing.user_id,
           name,
           role,
@@ -183,10 +187,13 @@ function UsersPanel({ queryClient }: { queryClient: ReturnType<typeof useQueryCl
           email: email.trim() && email.trim() !== editing.email ? email : null,
           password: password.trim() || null,
         })
+        await setStaffDisplayName(editing.user_id, displayName)
+        return
       }
       if (!email.trim() || !email.includes('@')) throw new Error('Valid email is required.')
       if (password.trim().length < 8) throw new Error('Password must be at least 8 characters.')
-      return createStaffUser({ name, email, password, role, branchIds })
+      const newUserId = await createStaffUser({ name, email, password, role, branchIds })
+      if (displayName.trim()) await setStaffDisplayName(newUserId, displayName)
     },
     onSuccess: async () => {
       setError(null)
@@ -261,6 +268,20 @@ function UsersPanel({ queryClient }: { queryClient: ReturnType<typeof useQueryCl
                 onChange={(e) => setName(e.target.value)}
                 className="mt-1 h-10 w-full rounded-dentaflow border border-line bg-canvas px-3 font-normal"
               />
+            </label>
+            <label className="block text-sm font-semibold md:col-span-2">
+              Name shown to patients (optional)
+              <input
+                value={displayName}
+                maxLength={60}
+                onChange={(e) => setDisplayName(e.target.value)}
+                placeholder="e.g. Dr. Hodan Ali"
+                className="mt-1 h-10 w-full rounded-dentaflow border border-line bg-canvas px-3 font-normal"
+              />
+              <span className="mt-1 block text-xs font-normal text-muted">
+                Shown as the Dentist on WhatsApp appointment messages. Leave blank to use a
+                dentist&apos;s own name. Owners and other roles show as &quot;Our dental team&quot;.
+              </span>
             </label>
             <label className="block text-sm font-semibold">
               Email
@@ -340,6 +361,7 @@ function UsersPanel({ queryClient }: { queryClient: ReturnType<typeof useQueryCl
           <thead className="border-b border-line bg-subtle text-xs tracking-wide text-muted uppercase">
             <tr>
               <th className="px-4 py-3 font-semibold">Name</th>
+              <th className="px-4 py-3 font-semibold">Shown to patients</th>
               <th className="px-4 py-3 font-semibold">Email</th>
               <th className="px-4 py-3 font-semibold">Role</th>
               <th className="px-4 py-3 font-semibold">Branches</th>
@@ -350,13 +372,13 @@ function UsersPanel({ queryClient }: { queryClient: ReturnType<typeof useQueryCl
           <tbody>
             {staffQuery.isLoading ? (
               <tr>
-                <td colSpan={6} className="px-4 py-8 text-muted">
+                <td colSpan={7} className="px-4 py-8 text-muted">
                   Loading…
                 </td>
               </tr>
             ) : rows.length === 0 ? (
               <tr>
-                <td colSpan={6} className="px-4 py-8 text-muted">
+                <td colSpan={7} className="px-4 py-8 text-muted">
                   No staff users yet.
                 </td>
               </tr>
@@ -364,6 +386,7 @@ function UsersPanel({ queryClient }: { queryClient: ReturnType<typeof useQueryCl
               rows.map((user) => (
                 <tr key={user.user_id} className="border-b border-line last:border-0">
                   <td className="px-4 py-3 font-semibold">{user.name}</td>
+                  <td className="px-4 py-3 text-muted">{user.display_name || '—'}</td>
                   <td className="px-4 py-3 text-muted">{user.email}</td>
                   <td className="px-4 py-3">{STAFF_ROLES.find((r) => r.value === user.role)?.label ?? user.role}</td>
                   <td className="px-4 py-3 text-xs text-muted">
