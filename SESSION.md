@@ -58,4 +58,6 @@ Apply staff-admin migration on remote, then smoke-test Settings → Users (creat
 
 Update this file when you finish a chunk of work on either machine.
 
-**39** - WhatsApp message polish done (migration 20261112100000, send-whatsapp, Settings display name). Next: apply migration, deploy, submit `_v2` templates (docs/WhatsApp-Templates-v2.md).
+**39** - WhatsApp message polish done (migration 20261112100000, send-whatsapp, Settings display name). Live sends still use approved `nis_*_en`.
+
+**40** - Templates v3 sheet ready: `docs/WhatsApp-Templates-v3.md` (footer + logo / PDF headers). `send-whatsapp` wired for `_v3`. Next: submit v3 in Meta, wait for Approved, then point each kind in WhatsApp → Templates. Do not flip live names until Approved.

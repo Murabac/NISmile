@@ -17,7 +17,7 @@ Submit each template below in Meta Business Manager > WhatsApp Manager > Message
 5. In the app: WhatsApp > Templates, set each template's Meta name (`nis_*_v2`) and status Approved. Keep the old templates until the new ones are approved.
 6. Settings > Users: set "Name shown to patients" for each dentist.
 
-Notes: the 24h reminder now has 5 variables and position 2 is the time left ("tomorrow", "in about 3 hours"). The two reply acknowledgements are free-form (sent inside the 24h window), so they need no Meta approval. Receipt and invoice templates carry a summary only; PDFs are not sent with templates.
+Notes: the 24h reminder now has 5 variables and position 2 is the time left ("tomorrow", "in about 3 hours"). The two reply acknowledgements are free-form (sent inside the 24h window), so they need no Meta approval. Receipt and invoice templates carry the summary. The app also sends the A4 PDF as a second message, with the care line in the caption. That PDF only arrives if the customer has messaged this business number in the last 24 hours, unless the Meta template itself is approved with a document header.
 
 ## appointment_confirmation
 
