@@ -233,13 +233,13 @@ These do not block the app skeleton.
 ## Step 39 - WhatsApp message polish
 
 - Migration `20261112100000_whatsapp_message_polish.sql`: first-name, friendly date and 12h time helpers, real dentist name (`profiles.display_name`, `set_staff_display_name`, fallback "Our dental team"), time-aware reminders (24h wording chosen at send time; 2h skipped when booked under 2h ahead or already confirmed), and all 12 `message_templates` rewritten with one layout and the contact line `https://wa.me/252634548732`.
-- `send-whatsapp`: image header for template names ending `_v2` / `_v3` (not receipt/invoice `_v3`). Document PDF header for `nis_receipt_notice_v3` / `nis_invoice_notice_v3`. Live `*_en` templates still get the care line on the last fill-in; `_v3` uses Meta’s static footer. Shared helpers in `whatsapp_care_footer.ts` / `whatsappCare.ts`.
+- `send-whatsapp`: image header for template names ending `_v2` / `_v3c` (not receipt/invoice). Document PDF header for `nis_receipt_notice_v3c` / `nis_invoice_notice_v3c`. Live `*_en` templates still get the care line on the last fill-in; `_v3c` uses Meta’s static footer plus a tappable **Contact care** URL button → Edge `care-whatsapp` (opens care WhatsApp +252 63 4548732; Meta blocks `wa.me` on buttons). Shared helpers in `whatsapp_care_footer.ts` / `whatsappCare.ts`.
 - App: Settings > Users has "Name shown to patients"; reminder button now sends `appointment_reminder_24h`.
-- Meta submission sheet: `docs/WhatsApp-Templates-v3.md` (footer `Questions? Contact +252 63 4548732`, logo on non-sale templates, PDF on receipt/invoice). Keep live `nis_*_en` until each `_v3` is Approved and set in WhatsApp → Templates.
+- Meta submission sheet: `docs/WhatsApp-Templates-v3.md` (footer `Questions? Contact +252 63 4548732`, **Contact care** button → care WhatsApp, logo on non-sale templates, PDF on receipt/invoice). Names are `nis_*_v3c`. Keep live `nis_*_en` until each `_v3c` is Approved and set in WhatsApp → Templates.
 
 ## Step 40 - WhatsApp templates v3 cutover
 
 1. Submit every template in `docs/WhatsApp-Templates-v3.md` in WhatsApp Manager (language `en`).
-2. Deploy `send-whatsapp` if not already on the `_v3` wiring.
-3. When Meta shows Approved, in DentaFlow → WhatsApp → Templates set Meta name to `nis_*_v3` and status Approved for that kind only.
-4. Do not flip a kind until its `_v3` is Approved. Production keeps `nis_*_en` until then.
+2. Deploy `send-whatsapp` if not already on the `_v3c` wiring (footer + Contact care button).
+3. When Meta shows Approved, in DentaFlow → WhatsApp → Templates set Meta name to `nis_*_v3c` and status Approved for that kind only.
+4. Do not flip a kind until its `_v3c` is Approved. Production keeps `nis_*_en` until then.

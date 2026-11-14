@@ -60,4 +60,4 @@ Update this file when you finish a chunk of work on either machine.
 
 **39** - WhatsApp message polish done (migration 20261112100000, send-whatsapp, Settings display name). Live sends still use approved `nis_*_en`.
 
-**40** - Templates v3 sheet ready: `docs/WhatsApp-Templates-v3.md` (footer + logo / PDF headers). `send-whatsapp` wired for `_v3`. Next: submit v3 in Meta, wait for Approved, then point each kind in WhatsApp → Templates. Do not flip live names until Approved.
+**40** - All 12 `nis_*_v3c` templates PENDING on WABA 1668738014220521: Meta footer + **Contact care** button → `care-whatsapp` Edge page → care WhatsApp +252 63 4548732. Live stays on `nis_*_en` until Approved, then set Meta name in WhatsApp → Templates.

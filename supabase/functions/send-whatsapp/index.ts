@@ -12,12 +12,13 @@
  * Approved Meta template names in message_templates.whatsapp_template_id use
  * the template API (language from WHATSAPP_TEMPLATE_LANGUAGE, default en).
  * Otherwise free-form text (24h customer window).
- * Sale receipt/invoice: when the Meta name is nis_receipt_notice_v3 or
- * nis_invoice_notice_v3, the A4 PDF rides in the template document header.
- * Live *_en templates still get the care line on the last fill-in. *_v3
- * templates use Meta's static footer instead (docs/WhatsApp-Templates-v3.md).
+ * Sale receipt/invoice: when the Meta name is nis_receipt_notice_v3c or
+ * nis_invoice_notice_v3c, the A4 PDF rides in the template document header.
+ * Live *_en templates still get the care line on the last fill-in. *_v3b
+ * templates use Meta's static footer + Contact care URL button
+ * (docs/WhatsApp-Templates-v3.md).
  *
- * Logo image header for names ending _v2 or _v3 (except receipt/invoice _v3).
+ * Logo image header for names ending _v2 or _v3b (except receipt/invoice).
  * Image URL: WHATSAPP_HEADER_IMAGE_URL or https://nismile.m2btek.com/whatsapp-header.jpg.
  */
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.49.1'
@@ -75,8 +76,8 @@ function digitsOnlyPhone(phone: string): string {
 
 /**
  * Live *_en templates have no Meta footer. Put the care line on the last fill-in
- * so those messages still show how to reach Customer Care. *_v3 templates skip
- * this — contact is the Meta footer "Questions? Contact +252 63 4548732".
+ * so those messages still show how to reach Customer Care. *_v3b templates skip
+ * this — contact is the Meta footer + tappable Contact care button.
  */
 function paramsWithCareFooter(
   params: Record<string, unknown>,
@@ -94,13 +95,18 @@ function paramsWithCareFooter(
 
 function shouldInjectCareIntoParams(templateName: string | null): boolean {
   if (!templateName) return false
-  if (/_v3$/i.test(templateName)) return false
+  // Meta footer + Contact care button cover care contact.
+  if (/_v3[bc]?$/i.test(templateName)) return false
   return true
 }
 
 const DEFAULT_HEADER_IMAGE_URL = 'https://nismile.m2btek.com/whatsapp-header.jpg'
 
 const DOCUMENT_HEADER_TEMPLATES = new Set([
+  'nis_receipt_notice_v3c',
+  'nis_invoice_notice_v3c',
+  'nis_receipt_notice_v3b',
+  'nis_invoice_notice_v3b',
   'nis_receipt_notice_v3',
   'nis_invoice_notice_v3',
   // Legacy experiment; keep until the v3 receipt is approved and switched on.
@@ -111,11 +117,11 @@ function isDocumentHeaderTemplate(templateName: string | null): boolean {
   return !!templateName && DOCUMENT_HEADER_TEMPLATES.has(templateName)
 }
 
-/** Logo image for _v2 / _v3 templates that are not the receipt/invoice PDF header. */
+/** Logo image for _v2 / _v3b templates that are not the receipt/invoice PDF header. */
 function headerImageFor(templateName: string | null): string | null {
   if (!templateName) return null
   if (isDocumentHeaderTemplate(templateName)) return null
-  if (!/_v[23]$/i.test(templateName)) return null
+  if (!/_v(?:2|3[bc]?)$/i.test(templateName)) return null
   return Deno.env.get('WHATSAPP_HEADER_IMAGE_URL') || DEFAULT_HEADER_IMAGE_URL
 }
 
@@ -368,8 +374,162 @@ function graphError(raw: Record<string, unknown>, fallback: string): string {
   return message || fallback
 }
 
-/** Create the receipt template whose header is the PDF file, if it is not there yet. */
-async function prepareReceiptFileTemplate(input: {
+const V3_FOOTER = 'Questions? Contact +252 63 4548732'
+/** Opens the human care WhatsApp (not the Cloud API number). */
+const V3_CARE_BUTTON_TEXT = 'Contact care'
+/** Meta rejects wa.me on URL buttons; this public page links to care WhatsApp. */
+const V3_CARE_BUTTON_URL =
+  'https://iwnswhnoxbvgyqljfvel.supabase.co/functions/v1/care-whatsapp'
+
+type V3TemplateSpec = {
+  name: string
+  category: 'UTILITY' | 'MARKETING'
+  header: 'IMAGE' | 'DOCUMENT'
+  body: string
+  examples: string[]
+}
+
+/** Bodies match docs/WhatsApp-Templates-v3.md. Footer + tappable Contact care button. */
+const V3_TEMPLATES: V3TemplateSpec[] = [
+  {
+    name: 'nis_appointment_confirmation_v3c',
+    category: 'UTILITY',
+    header: 'IMAGE',
+    body:
+      'Hello {{1}},\n\nYour appointment at N.I SMILE is booked.\n\n*Date:* {{2}}\n*Time:* {{3}}\n*Dentist:* {{4}}\n\nReply *1* to confirm or *2* to cancel.',
+    examples: ['Maryam', 'Friday, 13 November', '12:00 PM', 'Dr. Hodan Ali'],
+  },
+  {
+    name: 'nis_appointment_reminder_24h_v3c',
+    category: 'UTILITY',
+    header: 'IMAGE',
+    body:
+      'Hello {{1}},\n\nReminder: your appointment at N.I SMILE is {{2}}.\n\n*Date:* {{3}}\n*Time:* {{4}}\n*Dentist:* {{5}}\n\nReply *1* to confirm or *2* to cancel.',
+    examples: ['Maryam', 'tomorrow', 'Friday, 13 November', '12:00 PM', 'Dr. Hodan Ali'],
+  },
+  {
+    name: 'nis_appointment_reminder_2h_v3c',
+    category: 'UTILITY',
+    header: 'IMAGE',
+    body:
+      'Hello {{1}},\n\nYour appointment at N.I SMILE is in about 2 hours.\n\n*Date:* {{2}}\n*Time:* {{3}}\n*Dentist:* {{4}}\n\nReply *1* to confirm or *2* to cancel.',
+    examples: ['Maryam', 'Friday, 13 November', '12:00 PM', 'Dr. Hodan Ali'],
+  },
+  {
+    name: 'nis_appointment_reschedule_v3c',
+    category: 'UTILITY',
+    header: 'IMAGE',
+    body:
+      'Hello {{1}},\n\nYour appointment at N.I SMILE has been rescheduled.\n\n*New date:* {{2}}\n*New time:* {{3}}\n*Dentist:* {{4}}\n\nReply *1* to confirm or *2* to cancel.',
+    examples: ['Maryam', 'Saturday, 14 November', '10:30 AM', 'Dr. Hodan Ali'],
+  },
+  {
+    name: 'nis_appointment_cancel_v3c',
+    category: 'UTILITY',
+    header: 'IMAGE',
+    body:
+      'Hello {{1}},\n\nYour appointment at N.I SMILE on {{2}} at {{3}} has been cancelled. We can book a new time for you.',
+    examples: ['Maryam', 'Friday, 13 November', '12:00 PM'],
+  },
+  {
+    name: 'nis_appointment_reply_confirmed_v3c',
+    category: 'UTILITY',
+    header: 'IMAGE',
+    body:
+      'Thank you {{1}}! Your appointment is confirmed.\n\n*Date:* {{2}}\n*Time:* {{3}}\n\nWe look forward to seeing you at N.I SMILE.',
+    examples: ['Maryam', 'Friday, 13 November', '12:00 PM'],
+  },
+  {
+    name: 'nis_appointment_reply_cancelled_v3c',
+    category: 'UTILITY',
+    header: 'IMAGE',
+    body:
+      'Thank you {{1}}. Your appointment on {{2}} at {{3}} has been cancelled.\n\nTo book a new time, just message us.',
+    examples: ['Maryam', 'Friday, 13 November', '12:00 PM'],
+  },
+  {
+    name: 'nis_receipt_notice_v3c',
+    category: 'UTILITY',
+    header: 'DOCUMENT',
+    body:
+      'Hello {{1}},\n\nThank you for choosing N.I SMILE. Here is your receipt summary.\n\n*Receipt:* {{2}}\n*Total:* USD {{3}}\n*Paid:* USD {{4}}\n*Open balance:* USD {{5}}\n*Due date:* {{6}}.\n\nWe appreciate your visit.',
+    examples: ['Ali', 'RCP-20261113-001', '85.00', '85.00', '0.00', '13 November 2026'],
+  },
+  {
+    name: 'nis_invoice_notice_v3c',
+    category: 'UTILITY',
+    header: 'DOCUMENT',
+    body:
+      'Hello {{1}},\n\nThank you for choosing N.I SMILE. Here is your invoice summary.\n\n*Invoice:* {{2}}\n*Total:* USD {{3}}\n*Paid:* USD {{4}}\n*Open balance:* USD {{5}}\n*Due date:* {{6}}.\n\nWe appreciate your business.',
+    examples: ['Ali', 'INV-20261113-001', '340.00', '100.00', '240.00', '20 November 2026'],
+  },
+  {
+    name: 'nis_payment_due_reminder_v3c',
+    category: 'UTILITY',
+    header: 'IMAGE',
+    body:
+      'Hello {{1}},\n\nThis is a payment reminder from N.I SMILE.\n\n*Open balance:* USD {{2}}\n*Due date:* {{3}}\n\nPlease pay it on time.',
+    examples: ['Ali', '240.00', '20 November 2026'],
+  },
+  {
+    name: 'nis_promotion_announcement_v3c',
+    category: 'MARKETING',
+    header: 'IMAGE',
+    body: 'Hello,\n\n{{1}}\n\nReply STOP to opt out.',
+    examples: ['10% off teeth whitening until 30 November'],
+  },
+  {
+    name: 'nis_promotion_ending_soon_v3c',
+    category: 'MARKETING',
+    header: 'IMAGE',
+    body: 'Hello,\n\nEnding soon: {{1}}\n\nReply STOP to opt out.',
+    examples: ['10% off teeth whitening, last day is 30 November'],
+  },
+]
+
+async function uploadAppMediaHandle(input: {
+  token: string
+  graphVersion: string
+  appId: string
+  filename: string
+  mime: string
+  bytes: Uint8Array
+}): Promise<string> {
+  const session = await graphJson(
+    input.token,
+    input.graphVersion,
+    `${input.appId}/uploads?file_name=${encodeURIComponent(input.filename)}&file_length=${input.bytes.byteLength}&file_type=${encodeURIComponent(input.mime)}`,
+    { method: 'POST' },
+  )
+  const sessionId = String(session.raw.id ?? '')
+  if (!session.ok || !sessionId) {
+    throw new Error(graphError(session.raw, `Upload session failed for ${input.filename}`))
+  }
+  const uploadRes = await fetch(
+    `https://graph.facebook.com/${input.graphVersion}/${sessionId}`,
+    {
+      method: 'POST',
+      headers: {
+        Authorization: `OAuth ${input.token}`,
+        file_offset: '0',
+        'Content-Type': input.mime,
+      },
+      body: input.bytes,
+    },
+  )
+  const uploadRaw = (await uploadRes.json().catch(() => ({}))) as {
+    h?: string
+    error?: { message?: string }
+  }
+  const handle = uploadRaw.h ?? ''
+  if (!uploadRes.ok || !handle) {
+    throw new Error(uploadRaw.error?.message || `Upload failed for ${input.filename}`)
+  }
+  return handle
+}
+
+/** Create every v3 template on the phone's WABA (idempotent). */
+async function submitV3Templates(input: {
   token: string
   phoneNumberId: string
   graphVersion: string
@@ -392,33 +552,32 @@ async function prepareReceiptFileTemplate(input: {
   )
   const wabaId = entities.find((entity) => entity.entity_type === 'WABA')?.id ?? ''
   const appId = entities.find((entity) => entity.entity_type === 'APP')?.id ?? ''
-  if (!wabaId || !appId) return { ok: false, error: 'WhatsApp account id was not on the phone' }
-
-  const existing = await graphJson(
-    input.token,
-    input.graphVersion,
-    `${wabaId}/message_templates?name=nis_receipt_file_en&limit=5`,
-  )
-  const existingRows = (existing.raw.data as { name?: string; status?: string; id?: string }[] | undefined) ?? []
-  const already = existingRows.find((row) => row.name === 'nis_receipt_file_en')
-  if (already) {
-    return { ok: true, created: false, id: already.id ?? null, status: already.status ?? null }
+  if (!wabaId || !appId) {
+    return { ok: false, error: 'WhatsApp account id was not on the phone' }
   }
 
-  const current = await graphJson(
-    input.token,
-    input.graphVersion,
-    `${wabaId}/message_templates?name=nis_receipt_notice_en&limit=5`,
+  const imageRes = await fetch(
+    Deno.env.get('WHATSAPP_HEADER_IMAGE_URL') || DEFAULT_HEADER_IMAGE_URL,
   )
-  const currentRows = (current.raw.data as {
-    name?: string
-    components?: { type?: string; text?: string; example?: unknown }[]
-  }[] | undefined) ?? []
-  const source = currentRows.find((row) => row.name === 'nis_receipt_notice_en')
-  const body = source?.components?.find((component) => (component.type || '').toUpperCase() === 'BODY')
-  const footer = source?.components?.find((component) => (component.type || '').toUpperCase() === 'FOOTER')
-  if (!body?.text) {
-    return { ok: false, error: graphError(current.raw, 'Current receipt template was not found') }
+  if (!imageRes.ok) {
+    return { ok: false, error: `Logo image fetch failed HTTP ${imageRes.status}` }
+  }
+  const imageBytes = new Uint8Array(await imageRes.arrayBuffer())
+  let imageHandle: string
+  try {
+    imageHandle = await uploadAppMediaHandle({
+      token: input.token,
+      graphVersion: input.graphVersion,
+      appId,
+      filename: 'whatsapp-header.jpg',
+      mime: 'image/jpeg',
+      bytes: imageBytes,
+    })
+  } catch (err) {
+    return {
+      ok: false,
+      error: err instanceof Error ? err.message : String(err),
+    }
   }
 
   const pdf = await ensureSalePdfBytes({
@@ -428,68 +587,141 @@ async function prepareReceiptFileTemplate(input: {
     saleId: '53d89361-1d5b-4a50-9f3b-00d20c731608',
   })
   if (!pdf) return { ok: false, error: 'Sample receipt PDF was not found' }
-
-  const session = await graphJson(
-    input.token,
-    input.graphVersion,
-    `${appId}/uploads?file_name=${encodeURIComponent(pdf.filename)}&file_length=${pdf.bytes.byteLength}&file_type=application/pdf`,
-    { method: 'POST' },
-  )
-  const sessionId = String(session.raw.id ?? '')
-  if (!session.ok || !sessionId) {
-    return { ok: false, error: graphError(session.raw, 'PDF sample upload did not start') }
+  let documentHandle: string
+  try {
+    documentHandle = await uploadAppMediaHandle({
+      token: input.token,
+      graphVersion: input.graphVersion,
+      appId,
+      filename: pdf.filename,
+      mime: 'application/pdf',
+      bytes: pdf.bytes,
+    })
+  } catch (err) {
+    return {
+      ok: false,
+      error: err instanceof Error ? err.message : String(err),
+    }
   }
 
-  const uploadRes = await fetch(`https://graph.facebook.com/${input.graphVersion}/${sessionId}`, {
-    method: 'POST',
-    headers: {
-      Authorization: `OAuth ${input.token}`,
-      file_offset: '0',
-      'Content-Type': 'application/pdf',
-    },
-    body: pdf.bytes,
-  })
-  const uploadRaw = (await uploadRes.json().catch(() => ({}))) as { h?: string; error?: { message?: string } }
-  const handle = uploadRaw.h ?? ''
-  if (!uploadRes.ok || !handle) {
-    return { ok: false, error: uploadRaw.error?.message || 'PDF sample upload failed' }
+  const results: Record<string, unknown>[] = []
+  let deletedAny = false
+  const skipCreate = new Set<string>()
+
+  for (const spec of V3_TEMPLATES) {
+    const existing = await graphJson(
+      input.token,
+      input.graphVersion,
+      `${wabaId}/message_templates?name=${encodeURIComponent(spec.name)}&limit=5`,
+    )
+    const existingRows =
+      (existing.raw.data as { name?: string; status?: string; id?: string }[] | undefined) ?? []
+    const already = existingRows.find((row) => row.name === spec.name)
+    if (!already) continue
+    const status = (already.status || '').toUpperCase()
+    if (status === 'PENDING' || status === 'REJECTED') {
+      const deleted = await graphJson(
+        input.token,
+        input.graphVersion,
+        `${wabaId}/message_templates?name=${encodeURIComponent(spec.name)}`,
+        { method: 'DELETE' },
+      )
+      if (!deleted.ok) {
+        results.push({
+          name: spec.name,
+          created: false,
+          ok: false,
+          error: graphError(deleted.raw, `Could not replace ${status} template`),
+        })
+        skipCreate.add(spec.name)
+        continue
+      }
+      deletedAny = true
+      continue
+    }
+    results.push({
+      name: spec.name,
+      created: false,
+      id: already.id ?? null,
+      status: already.status ?? null,
+    })
+    skipCreate.add(spec.name)
   }
 
-  const created = await graphJson(
-    input.token,
-    input.graphVersion,
-    `${wabaId}/message_templates`,
-    {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        name: 'nis_receipt_file_en',
-        language: 'en',
-        category: 'UTILITY',
-        components: [
-          {
-            type: 'HEADER',
-            format: 'DOCUMENT',
-            example: { header_handle: [handle] },
-          },
-          {
-            type: 'BODY',
-            text: body.text,
-            ...(body.example ? { example: body.example } : {}),
-          },
-          ...(footer?.text ? [{ type: 'FOOTER', text: footer.text }] : []),
-        ],
-      }),
-    },
-  )
-  if (!created.ok) {
-    return { ok: false, error: graphError(created.raw, 'Receipt file template was not created') }
+  // Meta keeps the language locked briefly after DELETE; wait once before recreates.
+  if (deletedAny) {
+    await new Promise((resolve) => setTimeout(resolve, 90_000))
   }
+
+  for (const spec of V3_TEMPLATES) {
+    if (skipCreate.has(spec.name)) continue
+
+    const headerHandle = spec.header === 'DOCUMENT' ? documentHandle : imageHandle
+    const created = await graphJson(
+      input.token,
+      input.graphVersion,
+      `${wabaId}/message_templates`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name: spec.name,
+          language: 'en',
+          category: spec.category,
+          components: [
+            {
+              type: 'HEADER',
+              format: spec.header,
+              example: { header_handle: [headerHandle] },
+            },
+            {
+              type: 'BODY',
+              text: spec.body,
+              example: { body_text: [spec.examples] },
+            },
+            { type: 'FOOTER', text: V3_FOOTER },
+            {
+              type: 'BUTTONS',
+              buttons: [
+                {
+                  type: 'URL',
+                  text: V3_CARE_BUTTON_TEXT,
+                  url: V3_CARE_BUTTON_URL,
+                },
+              ],
+            },
+          ],
+        }),
+      },
+    )
+    if (!created.ok) {
+      const detail =
+        (created.raw.error as { error_user_msg?: string; message?: string } | undefined)
+          ?.error_user_msg ||
+        graphError(created.raw, 'Template create failed')
+      results.push({
+        name: spec.name,
+        created: false,
+        ok: false,
+        error: detail,
+      })
+      continue
+    }
+    results.push({
+      name: spec.name,
+      created: true,
+      ok: true,
+      id: created.raw.id ?? null,
+      status: created.raw.status ?? 'PENDING',
+    })
+  }
+
+  const failed = results.filter((row) => row.ok === false)
   return {
-    ok: true,
-    created: true,
-    id: created.raw.id ?? null,
-    status: created.raw.status ?? 'PENDING',
+    ok: failed.length === 0,
+    waba_id: wabaId,
+    templates: results,
+    failed: failed.length,
   }
 }
 
@@ -578,103 +810,15 @@ Deno.serve(async (req) => {
   }
 
   if (findAccount && role === 'owner') {
-    return json(await prepareReceiptFileTemplate({
-      token: accessToken,
-      phoneNumberId,
-      graphVersion,
-      dental,
-      storage: storageClient.storage,
-    }))
-    const auth = { Authorization: `Bearer ${accessToken}` }
-    const get = async (path: string) => {
-      const res = await fetch(`https://graph.facebook.com/${graphVersion}/${path}`, {
-        headers: auth,
-      })
-      const raw = await res.json().catch(() => ({}))
-      return { status: res.status, raw }
-    }
-    const debug = await get(
-      `debug_token?input_token=${encodeURIComponent(accessToken)}`,
+    return json(
+      await submitV3Templates({
+        token: accessToken,
+        phoneNumberId,
+        graphVersion,
+        dental,
+        storage: storageClient.storage,
+      }),
     )
-    const debugData = (debug.raw as { data?: { app_id?: string; user_id?: string } }).data
-    const probes = [
-      `${phoneNumberId}?metadata=1`,
-      `${phoneNumberId}?fields=health_status,account_mode,status,is_official_business_account`,
-      '1810714253642075/whatsapp_business_accounts?fields=id,name&limit=20',
-      '122106001251441947/businesses?fields=id,name&limit=20',
-      '122106001251441947?fields=id,name',
-    ]
-    const results = []
-    for (const path of probes) {
-      const hit = await get(path)
-      const err = (hit.raw as { error?: { message?: string } }).error?.message ?? null
-      const data = (hit.raw as { data?: { id?: string; name?: string; display_phone_number?: string }[] }).data
-      const fieldNames = (
-        (hit.raw as { metadata?: { fields?: { name?: string }[] } }).metadata?.fields ?? []
-      ).map((field) => field.name ?? '').filter(Boolean)
-      results.push({
-        path: path.split('?')[0],
-        status: hit.status,
-        error: err,
-        id: (hit.raw as { id?: string }).id ?? null,
-        name: (hit.raw as { verified_name?: string; name?: string }).verified_name
-          ?? (hit.raw as { name?: string }).name
-          ?? null,
-        phone: (hit.raw as { display_phone_number?: string }).display_phone_number ?? null,
-        keys: Object.keys(hit.raw as object),
-        entities: (
-          (hit.raw as {
-            health_status?: { entities?: { entity_type?: string; id?: string }[] }
-          }).health_status?.entities ?? []
-        ).map((entity) => ({
-          type: entity.entity_type ?? '',
-          id: entity.id ?? '',
-        })),
-        accounts: Array.isArray(data)
-          ? data.map((row) => ({
-              id: row.id ?? '',
-              name: row.name ?? row.display_phone_number ?? '',
-            }))
-          : [],
-      })
-    }
-    const wabaIds = [
-      '971929712636928',
-      '3511786538980918',
-      '1760730258560715',
-      '1425008463157224',
-      ...results.flatMap((row) => row.accounts.map((account) => account.id)),
-    ]
-    const accounts = []
-    for (const wabaId of [...new Set(wabaIds)]) {
-      const phones = await get(`${wabaId}/phone_numbers?fields=id,display_phone_number&limit=20`)
-      const templates = await get(
-        `${wabaId}/message_templates?name=nis_receipt_notice_en&limit=5`,
-      )
-      const phoneRows = (phones.raw as { data?: { id?: string; display_phone_number?: string }[] }).data ?? []
-      const templateRows = (templates.raw as { data?: { name?: string; status?: string }[] }).data ?? []
-      accounts.push({
-        wabaId,
-        phoneStatus: phones.status,
-        phoneError: (phones.raw as { error?: { message?: string } }).error?.message ?? null,
-        phones: phoneRows.map((row) => ({
-          id: row.id ?? '',
-          display: row.display_phone_number ?? '',
-        })),
-        templateStatus: templates.status,
-        templateError: (templates.raw as { error?: { message?: string } }).error?.message ?? null,
-        templates: templateRows.map((row) => ({
-          name: row.name ?? '',
-          status: row.status ?? '',
-        })),
-      })
-    }
-    return json({
-      ok: true,
-      app_id: debugData?.app_id ?? null,
-      probes: results,
-      accounts,
-    })
   }
 
   const { data: claimed, error: claimErr } = await dental.rpc(
