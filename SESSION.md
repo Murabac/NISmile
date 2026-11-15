@@ -60,4 +60,4 @@ Update this file when you finish a chunk of work on either machine.
 
 **39** - WhatsApp message polish done (migration 20261112100000, send-whatsapp, Settings display name). Live sends still use approved `nis_*_en`.
 
-**40** - All 12 `nis_*_v3c` templates PENDING on WABA 1668738014220521: Meta footer + **Contact care** button → `care-whatsapp` Edge page → care WhatsApp +252 63 4548732. Live stays on `nis_*_en` until Approved, then set Meta name in WhatsApp → Templates.
+**40** - Cut over to approved `nis_*_v3c` (footer + Contact care). Migration `20261115100000_whatsapp_templates_v3c_cutover.sql`. Old Meta `nis_*` names removed via `cleanup_old_templates`.

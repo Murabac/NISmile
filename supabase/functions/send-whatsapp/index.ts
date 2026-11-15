@@ -725,6 +725,83 @@ async function submitV3Templates(input: {
   }
 }
 
+/** Keep only nis_*_v3c; delete older nis_* Meta templates (_en, _v2, _v3, _v3b, …). */
+function isRetiredNisTemplate(name: string): boolean {
+  if (!/^nis_/i.test(name)) return false
+  if (/_v3c$/i.test(name)) return false
+  return true
+}
+
+async function cleanupOldMetaTemplates(input: {
+  token: string
+  phoneNumberId: string
+  graphVersion: string
+}): Promise<Record<string, unknown>> {
+  const phone = await graphJson(
+    input.token,
+    input.graphVersion,
+    `${input.phoneNumberId}?fields=health_status`,
+  )
+  if (!phone.ok) {
+    return { ok: false, error: graphError(phone.raw, 'Phone lookup failed') }
+  }
+  const entities = (
+    (phone.raw.health_status as { entities?: { entity_type?: string; id?: string }[] } | undefined)
+      ?.entities ?? []
+  )
+  const wabaId = entities.find((entity) => entity.entity_type === 'WABA')?.id ?? ''
+  if (!wabaId) {
+    return { ok: false, error: 'WhatsApp account id was not on the phone' }
+  }
+
+  const listed: { name?: string; status?: string; id?: string }[] = []
+  let after: string | undefined
+  for (let page = 0; page < 20; page += 1) {
+    const path =
+      `${wabaId}/message_templates?limit=100&fields=name,status,id` +
+      (after ? `&after=${encodeURIComponent(after)}` : '')
+    const pageRes = await graphJson(input.token, input.graphVersion, path)
+    if (!pageRes.ok) {
+      return { ok: false, error: graphError(pageRes.raw, 'Template list failed'), waba_id: wabaId }
+    }
+    const rows =
+      (pageRes.raw.data as { name?: string; status?: string; id?: string }[] | undefined) ?? []
+    listed.push(...rows)
+    after = (pageRes.raw.paging as { cursors?: { after?: string } } | undefined)?.cursors?.after
+    if (!after || rows.length === 0) break
+  }
+
+  const keep = listed.filter((row) => row.name && !isRetiredNisTemplate(row.name))
+  const retire = listed.filter((row) => row.name && isRetiredNisTemplate(row.name))
+  const results: Record<string, unknown>[] = []
+
+  for (const row of retire) {
+    const name = row.name!
+    const deleted = await graphJson(
+      input.token,
+      input.graphVersion,
+      `${wabaId}/message_templates?name=${encodeURIComponent(name)}`,
+      { method: 'DELETE' },
+    )
+    results.push({
+      name,
+      id: row.id ?? null,
+      status: row.status ?? null,
+      ok: deleted.ok,
+      error: deleted.ok ? null : graphError(deleted.raw, 'Delete failed'),
+    })
+  }
+
+  const failed = results.filter((row) => row.ok === false)
+  return {
+    ok: failed.length === 0,
+    waba_id: wabaId,
+    kept: keep.map((row) => ({ name: row.name, status: row.status, id: row.id })),
+    deleted: results,
+    failed: failed.length,
+  }
+}
+
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: cors })
@@ -794,6 +871,7 @@ Deno.serve(async (req) => {
   let limit = 10
   let queueId: string | null = null
   let findAccount = false
+  let cleanupOldTemplates = false
   try {
     const body = await req.json().catch(() => ({}))
     if (body && typeof body === 'object') {
@@ -804,9 +882,21 @@ Deno.serve(async (req) => {
         queueId = (body as { queue_id: string }).queue_id
       }
       findAccount = (body as { find_account?: unknown }).find_account === true
+      cleanupOldTemplates =
+        (body as { cleanup_old_templates?: unknown }).cleanup_old_templates === true
     }
   } catch {
     /* empty body ok */
+  }
+
+  if (cleanupOldTemplates && role === 'owner') {
+    return json(
+      await cleanupOldMetaTemplates({
+        token: accessToken,
+        phoneNumberId,
+        graphVersion,
+      }),
+    )
   }
 
   if (findAccount && role === 'owner') {

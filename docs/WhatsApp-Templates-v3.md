@@ -15,13 +15,11 @@ That page links to the human **Customer Care** WhatsApp (`+252 63 4548732` / `wa
 
 **Do not put the long `wa.me` care URL in the body.** Contact is the Meta footer plus the tappable **Contact care** button.
 
-## Switch-on steps
+## Live cutover (done when `_v3c` is Approved)
 
-1. Redeploy the app (Coolify) so `/whatsapp-header.jpg` is public if you use the logo header.
-2. Deploy Edge Function: `npx supabase functions deploy send-whatsapp --remote=iwnswhnoxbvgyqljfvel`.
-3. Submit every template below. Wait until each is **Approved**.
-4. In DentaFlow: WhatsApp → Templates, set each row’s Meta name to the `nis_*_v3c` name and status to **Approved**. Leave the live `nis_*_en` names until then.
-5. Keep using today’s approved templates for production until step 4 is done for the kinds you need.
+1. Migration `20261115100000_whatsapp_templates_v3c_cutover.sql` sets every DentaFlow `message_templates` Meta name to `nis_*_v3c`, status **Approved**, and bodies to match this sheet.
+2. Owner can delete retired Meta names (`nis_*_en`, `_v2`, `_v3`, `_v3b`) via `send-whatsapp` `{ "cleanup_old_templates": true }`.
+3. Production sends use `_v3c` only (footer + Contact care button).
 
 Notes: the 24h reminder has 5 variables; position 2 is the time left (“tomorrow”, “in about 3 hours”). Reply *1* / *2* stays on booking/reminder/reschedule bodies. Promotions are MARKETING and include STOP. Receipt and invoice carry the PDF on the same message as the summary.
 
