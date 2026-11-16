@@ -21,22 +21,24 @@ import type { ReportPeriod, ReportResult, ReportType } from '../lib/reports/type
 
 export function ReportPrintModal({
   type,
+  title: titleOverride,
   period,
   branchLabel,
   data,
   highlights,
   onClose,
 }: {
-  type: ReportType
+  type?: ReportType
+  title?: string
   period: ReportPeriod
   branchLabel: string
   data: ReportResult
   highlights: Array<{ label: string; value: string }>
   onClose: () => void
 }) {
-  const title = reportTitle(type)
+  const title = titleOverride ?? (type ? reportTitle(type) : 'Report')
   const subtitle = reportSubtitle({
-    type,
+    type: type ?? 'sales',
     period,
     branchLabel,
     startsAt: data.starts_at,

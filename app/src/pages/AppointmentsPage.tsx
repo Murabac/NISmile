@@ -49,9 +49,11 @@ function formatTime(iso: string) {
 }
 
 export function AppointmentsPage() {
-  const { branchId } = useAuth()
+  const { branchId, branches } = useAuth()
   const navigate = useNavigate()
   const queryClient = useQueryClient()
+  const activeBranch = branches.find((b) => b.id === branchId)
+  const isWarehouse = activeBranch?.kind === 'warehouse'
   const [weekAnchor, setWeekAnchor] = useState(() => startOfWeek(new Date()))
   const [dentistFilter, setDentistFilter] = useState('all')
   const [viewMode, setViewMode] = useState<ViewMode>('calendar')
@@ -301,6 +303,18 @@ export function AppointmentsPage() {
         <h1 className="text-3xl font-semibold">Appointments</h1>
         <p className="mt-3 max-w-xl text-muted">
           Choose one branch in the header to manage the patient calendar.
+        </p>
+      </section>
+    )
+  }
+
+  if (isWarehouse) {
+    return (
+      <section className="rounded-dentaflow border border-line bg-surface p-6">
+        <h1 className="text-3xl font-semibold">Appointments</h1>
+        <p className="mt-3 max-w-xl text-muted">
+          Appointments are only on clinic branches. Switch to a clinic branch, or use Wholesale
+          Orders for warehouse sales.
         </p>
       </section>
     )

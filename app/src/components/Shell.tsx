@@ -1,15 +1,17 @@
 import { useState } from 'react'
 import { Navigate, Outlet, useLocation } from 'react-router-dom'
 import { useAuth } from '../lib/auth.tsx'
-import { screenByPath } from '../lib/navigation.ts'
+import { screenAllowedForBranch, screenByPath } from '../lib/navigation.ts'
 import { Header } from './Header.tsx'
 import { Sidebar } from './Sidebar.tsx'
 
 export function Shell() {
-  const { session, loading, profile, signOut } = useAuth()
+  const { session, loading, profile, signOut, branchId, branches } = useAuth()
   const location = useLocation()
   const [mobileOpen, setMobileOpen] = useState(false)
   const screen = screenByPath(location.pathname)
+  const branchKind =
+    branchId === 'all' ? null : (branches.find((b) => b.id === branchId)?.kind ?? null)
 
   if (loading) {
     return <p className="p-8 text-muted">Loading…</p>
@@ -29,6 +31,10 @@ export function Shell() {
   }
 
   if (screen && !screen.roles.includes(profile.role)) {
+    return <Navigate to="/" replace />
+  }
+
+  if (screen && !screenAllowedForBranch(screen, branchKind)) {
     return <Navigate to="/" replace />
   }
 

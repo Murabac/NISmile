@@ -26,7 +26,6 @@ import {
   formatMoneyForRegion,
   rateForRegion,
 } from '../lib/money.ts'
-import { customerArBalance } from '../lib/customers/api.ts'
 import { fetchClinicSettings, previewLoyaltyRedeem } from '../lib/loyalty/api.ts'
 import { evaluateCartPromotion } from '../lib/promotions/api.ts'
 import {
@@ -107,8 +106,6 @@ export function PosPage() {
   const [cart, setCart] = useState<CartLine[]>([])
   const [tenders, setTenders] = useState<TenderDraft>(emptyTenders)
   const [foreignPay, setForeignPay] = useState('')
-  const [chargeToAccount, setChargeToAccount] = useState(false)
-  const [dueDate, setDueDate] = useState(() => defaultDueDate())
   const [error, setError] = useState<string | null>(null)
   const [lastSale, setLastSale] = useState<Sale | null>(null)
   const [lastCustomerName, setLastCustomerName] = useState('Walk-in')
@@ -130,16 +127,15 @@ export function PosPage() {
   function chooseCustomer(id: string) {
     if (id !== customerId) {
       setCustomerId(id)
-      setCart([])
+      // Keep cart; items stay on retail list. Service prices stay as entered.
       setLastSale(null)
-      setChargeToAccount(false)
-      setDueDate(defaultDueDate())
     }
     setCustomerQuery('')
     setCustomerOpen(false)
   }
 
-  const branchReady = branchId !== 'all'
+  const isClinic = activeBranch?.kind !== 'warehouse'
+  const branchReady = branchId !== 'all' && isClinic
 
   const itemsQuery = useQuery({
     queryKey: ['items'],
@@ -169,7 +165,11 @@ export function PosPage() {
 
   const items = (itemsQuery.data ?? []).filter((row) => row.active) as CatalogItem[]
   const services = (servicesQuery.data ?? []).filter((row) => row.active) as CatalogService[]
-  const customers = customersQuery.data ?? []
+  // Clinic POS is retail patients only — wholesale buyers use Wholesale Orders.
+  const customers = useMemo(
+    () => (customersQuery.data ?? []).filter((c) => c.customer_type !== 'wholesale'),
+    [customersQuery.data],
+  )
   const customerChoices = useMemo(() => {
     const q = customerQuery.trim().toLowerCase()
     const showWalkIn = !q || 'walk-in'.startsWith(q) || 'walk in'.startsWith(q)
@@ -253,16 +253,7 @@ export function PosPage() {
   ])
 
   const selectedCustomer = customers.find((c) => c.id === customerId) ?? null
-  const isWholesale = selectedCustomer?.customer_type === 'wholesale'
-  const priceList = isWholesale ? 'wholesale' : 'retail'
-  const creditLimit = selectedCustomer?.credit_limit
-
-  const arQuery = useQuery({
-    queryKey: ['customer_ar', selectedCustomer?.id],
-    queryFn: () => customerArBalance(selectedCustomer!.id),
-    enabled: branchReady && Boolean(selectedCustomer?.id && isWholesale),
-  })
-  const currentAr = arQuery.data ?? 0
+  const priceList = 'retail' as const
 
   const itemCategories = useMemo(() => {
     const map = new Map<string, string>()
@@ -313,6 +304,7 @@ export function PosPage() {
         item_id: line.item_id,
         service_id: line.service_id,
         qty: line.qty,
+        ...(line.line_type === 'service' ? { unit_price: line.unit_price } : {}),
       })),
     [cart],
   )
@@ -481,9 +473,6 @@ export function PosPage() {
     })
   }
 
-  const onAccountAmount =
-    isWholesale && chargeToAccount ? remaining : remaining > 0 && !isWholesale ? remaining : 0
-
   const checkoutMutation = useMutation({
     mutationFn: async () => {
       const payments = (Object.keys(tenders) as PaymentTender[])
@@ -505,19 +494,7 @@ export function PosPage() {
 
       const unpaid = round2(cartTotals.total - paidTotal)
       if (unpaid > 0.009) {
-        if (!isWholesale || !chargeToAccount) {
-          if (payments.length === 0) throw new Error('Enter at least one payment amount.')
-          if (isWholesale) throw new Error('Turn on Charge remainder to account, or pay in full.')
-        } else {
-          if (!dueDate) throw new Error('Due date is required for on-account sales.')
-          const limit = Number(creditLimit ?? 0)
-          if (limit <= 0) throw new Error('Customer has no credit limit; pay in full.')
-          if (currentAr + unpaid > limit + 0.009) {
-            throw new Error(
-              `Credit limit exceeded (AR ${currentAr.toFixed(2)} + ${unpaid.toFixed(2)} > ${limit.toFixed(2)}).`,
-            )
-          }
-        }
+        if (payments.length === 0) throw new Error('Enter at least one payment amount.')
       } else if (payments.length === 0) {
         throw new Error('Enter at least one payment amount.')
       }
@@ -534,9 +511,10 @@ export function PosPage() {
           item_id: line.item_id,
           service_id: line.service_id,
           qty: line.qty,
+          ...(line.line_type === 'service' ? { unit_price: line.unit_price } : {}),
         })),
         payments,
-        dueDate: isWholesale && unpaid > 0.009 && chargeToAccount ? dueDate : null,
+        dueDate: null,
         redeemPoints: redeemLoyalty ? loyaltyPointsUsed : 0,
       })
 
@@ -550,16 +528,14 @@ export function PosPage() {
       setError(null)
       setCart([])
       setTenders(emptyTenders())
-      setChargeToAccount(false)
       setRedeemLoyalty(false)
-      setDueDate(defaultDueDate())
       setLastSale(sale)
       setLastCustomerName(
         customerId === 'walk-in'
           ? 'Walk-in'
           : (customers.find((c) => c.id === customerId)?.name ?? 'Customer'),
       )
-      setDocsMode(isWholesale ? 'invoice' : 'receipt')
+      setDocsMode('receipt')
       setDocsOpen(true)
       if (appointmentId) {
         setAppointmentId(null)
@@ -571,8 +547,6 @@ export function PosPage() {
       await queryClient.invalidateQueries({ queryKey: ['sales'] })
       await queryClient.invalidateQueries({ queryKey: ['pos_customers'] })
       await queryClient.invalidateQueries({ queryKey: ['customers'] })
-      await queryClient.invalidateQueries({ queryKey: ['customer_ar'] })
-      await queryClient.invalidateQueries({ queryKey: ['customers'] })
     },
     onError: (err: Error) => setError(err.message),
   })
@@ -583,7 +557,7 @@ export function PosPage() {
     const nextQty = (existing?.qty ?? 0) + 1
     const unit =
       resolveDisplayPrice(item.item_prices ?? [], priceList, nextQty) ??
-      basePrice(item.item_prices ?? [], priceList === 'wholesale' ? 'wholesale' : 'retail') ??
+      basePrice(item.item_prices ?? [], 'retail') ??
       0
     setLastSale(null)
     setError(null)
@@ -667,22 +641,30 @@ export function PosPage() {
           const qty = line.qty + delta
           if (qty <= 0) return null
           if (line.line_type === 'service' && qty !== Math.trunc(qty)) return line
-          const item = items.find((row) => row.id === line.item_id)
-          const service = services.find((row) => row.id === line.service_id)
-          let unit = line.unit_price
-          if (item) {
-            unit =
-              resolveDisplayPrice(item.item_prices ?? [], priceList, qty) ??
-              line.unit_price
-          } else if (service) {
-            unit =
-              resolveDisplayPrice(service.service_prices ?? [], 'retail', qty, {
-                retailOnly: true,
-              }) ?? line.unit_price
+          // Services keep the checkout-entered price; items follow catalog tiers.
+          if (line.line_type === 'service') {
+            return { ...line, qty }
           }
+          const item = items.find((row) => row.id === line.item_id)
+          const unit = item
+            ? (resolveDisplayPrice(item.item_prices ?? [], priceList, qty) ?? line.unit_price)
+            : line.unit_price
           return { ...line, qty, unit_price: unit }
         })
         .filter(Boolean) as CartLine[],
+    )
+  }
+
+  function updateServicePrice(key: string, raw: string) {
+    const cleaned = raw.replace(/[^\d.]/g, '')
+    const parsed = cleaned === '' || cleaned === '.' ? 0 : Number(cleaned)
+    if (!Number.isFinite(parsed) || parsed < 0) return
+    setCart((current) =>
+      current.map((line) =>
+        line.key === key && line.line_type === 'service'
+          ? { ...line, unit_price: round2(parsed) }
+          : line,
+      ),
     )
   }
 
@@ -696,7 +678,9 @@ export function PosPage() {
       <section className="rounded-dentaflow border border-line bg-surface p-6">
         <h1 className="text-3xl font-semibold">Point of Sale</h1>
         <p className="mt-3 max-w-xl text-muted">
-          Choose one branch in the header before ringing up a sale.
+          {branchId !== 'all' && !isClinic
+            ? 'Point of Sale is for clinic branches only. Switch to a clinic, or use Wholesale Orders on the warehouse.'
+            : 'Choose one clinic branch in the header before ringing up a sale.'}
         </p>
       </section>
     )
@@ -1067,7 +1051,6 @@ export function PosPage() {
                               {queryHasDigits && customer.phone
                                 ? customer.name
                                 : customer.phone || 'No phone'}
-                              {customer.customer_type === 'wholesale' ? ' · Wholesale' : ''}
                             </span>
                           </span>
                         </button>
@@ -1082,29 +1065,7 @@ export function PosPage() {
                 </ul>
               ) : null}
             </div>
-            <p className="text-[11px] text-muted">
-              Price list: {priceList === 'wholesale' ? 'Wholesale items' : 'Retail'}
-              {priceList === 'wholesale' ? ' · services stay patient-priced' : ''}
-            </p>
-            {isWholesale ? (
-              <div className="rounded-dentaflow bg-canvas px-3 py-2 text-[11px]">
-                <div className="flex justify-between gap-2">
-                  <span className="text-muted">Open AR</span>
-                  <span className="font-mono font-bold">{formatMoney(currentAr)}</span>
-                </div>
-                <div className="mt-1 flex justify-between gap-2">
-                  <span className="text-muted">Credit limit</span>
-                  <span className="font-mono font-bold">
-                    {creditLimit == null || Number(creditLimit) <= 0
-                      ? 'None'
-                      : formatMoney(Number(creditLimit))}
-                  </span>
-                </div>
-                {selectedCustomer?.subtype ? (
-                  <p className="mt-1 text-muted">Subtype: {selectedCustomer.subtype}</p>
-                ) : null}
-              </div>
-            ) : null}
+            <p className="text-[11px] text-muted">Price list: Retail</p>
           </div>
 
           <div className="space-y-2">
@@ -1130,9 +1091,26 @@ export function PosPage() {
                   <div key={line.key} className="flex items-start gap-2 px-3 py-3 text-xs">
                     <div className="min-w-0 flex-1">
                       <p className="font-bold">{line.name}</p>
-                      <p className="font-mono text-[10px] text-muted">
-                        {line.sku_or_code} · {formatMoney(line.unit_price)} ex-VAT
-                      </p>
+                      <p className="font-mono text-[10px] text-muted">{line.sku_or_code}</p>
+                      {line.line_type === 'service' ? (
+                        <label className="mt-2 flex items-center gap-2">
+                          <span className="text-[10px] font-semibold text-muted">Price</span>
+                          <input
+                            type="text"
+                            inputMode="decimal"
+                            value={String(line.unit_price)}
+                            onChange={(event) => updateServicePrice(line.key, event.target.value)}
+                            onFocus={(event) => event.currentTarget.select()}
+                            className="h-7 w-24 rounded-md border border-line bg-canvas px-2 font-mono text-xs"
+                            aria-label={`Price for ${line.name}`}
+                          />
+                          <span className="text-[10px] text-muted">ex-VAT</span>
+                        </label>
+                      ) : (
+                        <p className="mt-1 font-mono text-[10px] text-muted">
+                          {formatMoney(line.unit_price)} ex-VAT
+                        </p>
+                      )}
                       <div className="mt-2 inline-flex items-center gap-1">
                         <button
                           type="button"
@@ -1326,36 +1304,6 @@ export function PosPage() {
             ) : null}
           </div>
 
-          {isWholesale ? (
-            <div className="space-y-2 rounded-dentaflow border border-line bg-canvas p-3">
-              <label className="flex items-center gap-2 text-sm font-semibold">
-                <input
-                  type="checkbox"
-                  checked={chargeToAccount}
-                  onChange={(event) => setChargeToAccount(event.target.checked)}
-                  className="rounded border-line"
-                />
-                Charge remainder to account
-              </label>
-              {chargeToAccount ? (
-                <label className="block text-xs font-semibold">
-                  Due date
-                  <input
-                    type="date"
-                    value={dueDate}
-                    onChange={(event) => setDueDate(event.target.value)}
-                    className="mt-1 h-10 w-full rounded-dentaflow border border-line bg-surface px-3 font-normal"
-                  />
-                </label>
-              ) : null}
-              {chargeToAccount && onAccountAmount > 0 ? (
-                <p className="text-[11px] text-muted">
-                  On account: {formatMoney(onAccountAmount)} (not a tender)
-                </p>
-              ) : null}
-            </div>
-          ) : null}
-
           <button
             type="button"
             disabled={checkoutMutation.isPending || cart.length === 0 || overpaid}
@@ -1364,11 +1312,9 @@ export function PosPage() {
           >
             {checkoutMutation.isPending
               ? 'Processing…'
-              : isWholesale && chargeToAccount && remaining > 0
-                ? 'Complete on-account checkout'
-                : remaining > 0 && paidTotal > 0
-                  ? 'Complete partial checkout'
-                  : 'Complete checkout'}
+              : remaining > 0 && paidTotal > 0
+                ? 'Complete partial checkout'
+                : 'Complete checkout'}
           </button>
         </div>
       </div>
@@ -1378,10 +1324,4 @@ export function PosPage() {
 
 function round2(n: number) {
   return Math.round(n * 100) / 100
-}
-
-function defaultDueDate() {
-  const d = new Date()
-  d.setDate(d.getDate() + 7)
-  return d.toISOString().slice(0, 10)
 }

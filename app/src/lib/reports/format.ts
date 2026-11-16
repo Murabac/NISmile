@@ -36,6 +36,10 @@ const MONEY_KEYS = new Set([
   'zaad',
   'edahab',
   'mycash',
+  'unpaid_total',
+  'avg_ticket',
+  'items_net',
+  'services_net',
 ])
 
 export function humanizeKey(key: string): string {

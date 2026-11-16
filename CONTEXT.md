@@ -2,7 +2,7 @@
 
 This file is the map for building DentaFlow. The product spec is `DentaFlow-Project-Plan-v2.md`. The look and screen behavior come from `Design Ref/`. Logos live in `Brand/`.
 
-**Current step:** WhatsApp `_v3c` cutover live (step 40). Apply migration `20261115100000_whatsapp_templates_v3c_cutover.sql` if not on remote yet. Do not invent VAT, loyalty, FX rates, MyCash, or WhatsApp tokens.
+**Current step:** WhatsApp live cutover to `nis_*_v3d` done (Meta Approved; DentaFlow Meta names + `send-whatsapp` cleanup). Do not invent VAT, loyalty, FX rates, MyCash, or WhatsApp tokens.
 
 ## What this repo is
 
@@ -24,16 +24,17 @@ DentaFlow is a multi-branch dental clinic system: inventory, retail and wholesal
 - **Currency:** **USD is the ledger** (prices, stock, sales, AR, reports, loyalty). Store money as `numeric(12,2)`. Owner sets **manual** FX in Settings → Exchange rates: `fx_slsh_per_usd` and `fx_etb_per_usd` (units per 1 USD). Blank until filled — do not invent rates.
 - **Staff app language:** English only. No language switcher, no translated screens, no RTL layout. Section 3.8 of the plan and the prototype's language switcher are superseded.
 - **WhatsApp languages:** message content is **English only**. Meta Cloud API templates use **`en_US`**. `customers.language` is forced to `en` (so/ar enum values unused). No customer language picker. Staff UI stays English-only (no screen translation / no RTL switcher).
-- **Branches:** Schema supports many branches. Owner manages them in **Settings → Branches** (create, edit, deactivate, delete). Each branch has a **region**: `somaliland` | `ethiopia`. **Somaliland** customer docs / POS dual line = **USD + SLSH**; **Ethiopia** = **USD + ETB** (when that rate is set). Seed / default region `somaliland`. Owners can view all branches once more exist. Everyone else is limited to their branches. **Operating stock model:** retail on-hand lives on **N.I SMILE Hargeisa**; wholesale on-hand on **N.I SMILE Wholesale**; clinic restock via Stock Transfers. Sample seed **Hargeisa North** was demo-only for Transfers — not a real clinic.
+- **Branches:** Schema supports many branches. Owner manages them in **Settings → Branches** (create, edit, deactivate, delete). Each branch has a **region**: `somaliland` | `ethiopia`, and a **kind**: `clinic` | `warehouse` (default `clinic`). **Somaliland** customer docs / POS dual line = **USD + SLSH**; **Ethiopia** = **USD + ETB** (when that rate is set). Seed / default region `somaliland`. Owners can view all branches once more exist. Everyone else is limited to their branches. **Operating model:** **clinic** branches (e.g. Hargeisa, Jigjiga) run retail POS + appointments + patients; **warehouse** branch (**N.I SMILE Wholesale**) is stock / purchases / transfers / wholesale buyers + **Wholesale Orders** only — no clinic POS, no appointments. Clinic restock via Stock Transfers from the warehouse. Sample seed **Hargeisa North** was demo-only for Transfers — not a real clinic.
 - **Shared across branches:** items, services, price lists, tax rates.
-- **Per branch:** customers (patients and wholesale), stock, sales, appointments, purchases, expenses, cash. A customer record belongs to one branch.
-- **Expenses:** branch operating costs (rent, utilities, salaries, etc.) paid with Cash / Zaad / eDahab / MyCash. Posted or void. Categories are shared. Owner / branch manager / receptionist can record.
-- **Wholesale:** staff enter orders. Buyer subtypes: clinic, pharmacy/shop, lab, individual dentist. Credit limit, due date, statement.
+- **Per branch:** customers, stock, sales, purchases, expenses, cash. Appointments only on **clinic** branches. A customer record belongs to one branch: **retail patients on clinics**, **wholesale buyers on the warehouse**.
+- **Expenses:** branch operating costs (rent, utilities, salaries, etc.) paid with Cash / Zaad / eDahab / MyCash. Posted or void. Categories are shared. Owner / branch manager / receptionist can record. Warehouse may use expenses for overhead.
+- **Wholesale:** sold only from **Wholesale Orders** (`/wholesale`) on the warehouse branch — items + wholesale price list + credit/AR — not from clinic POS. Buyer subtypes: clinic, pharmacy/shop, lab, individual dentist. Credit limit, due date, statement.
 - **Stock:** one ledger. Never edit quantity in place. Deduct batches with FEFO (first expiry first).
 - **Checkout:** sale, VAT, promotion, points, and stock deduction run in one database transaction.
 - **Prices on a sale** are copied onto the line at sale time (net, tax, gross, promotion).
 - **Loyalty:** earn and redeem rates are Settings fields, left blank until the owner fills them in. Earn on the paid amount excluding VAT. One balance per customer record. Every change is a ledger row. Returns reverse points.
 - **Promotions:** best single promotion wins. No stacking. **Only the owner publishes promotions**, and chooses which branches they apply to.
+- **Staff performance:** owner-only screen at `/staff-performance`. Ranks checkout staff by `sales.created_by` (sale count, revenue, paid/unpaid, avg ticket, items vs services net) and appointment booking by `appointments.created_by` (booked / completed / no-show / cancelled / open) for the selected period and branch. Excel export and Print / Save PDF.
 - **VAT:** shelf prices **exclude** tax. VAT is added at checkout. The percentage is a Settings value and stays empty until the clinic confirms it.
 - **Receipts:** thermal print at **80 mm by default, with 58 mm available**, A4 PDF invoice, and WhatsApp PDF, all from the same sale.
 - **Checkout tenders:** Cash, Zaad, eDahab, and MyCash. MyCash is an Amal Bank service, not physical cash. Wholesale on-account balance (credit limit, due date, statement) stays in the product; it is not a fifth tender named cash.
@@ -70,7 +71,7 @@ Copy these tokens from `Design Ref/src/index.css`.
 - **Direction:** the staff app stays left-to-right. Do not set `dir="rtl"` and do not build a mirrored layout.
 - **Staff logo:** `Brand/dentaflow-logo.svg` for the wordmark and `Brand/dentaflow-icon.svg` for the app icon and favicon. Do not redraw the tooth from `Design Ref`, and do not use `Brand/nismile-logo.jpg` in the staff app.
 - **Shell:** fixed marine sidebar (`lg:ms-64` is fine as spacing from the sidebar), header with branch switcher, dark toggle, notification count. No language switcher. Mobile sidebar is a drawer. Content max width `max-w-7xl`.
-- **Screens and nav order** match `Design Ref/src/components/common/Sidebar.tsx`, plus **Sales** after Point of Sale and **Expenses** after Purchases: Dashboard, Point of Sale (highlighted), Sales, Stock, Transfers, Purchases, Expenses, Services, Customers, Appointments, Promotions (coral), WhatsApp, Reports, Import, Settings.
+- **Screens and nav order** match `Design Ref/src/components/common/Sidebar.tsx`, plus **Sales** after Point of Sale / Wholesale Orders and **Expenses** after Purchases. Nav is **branch-kind aware**: clinics show Point of Sale, Services, Appointments; warehouse shows Wholesale Orders instead. Shared: Dashboard, Sales, Stock, Transfers, Purchases, Expenses, Customers, Promotions (coral), WhatsApp, Reports, **Staff performance** (owner), Import, Settings.
 - **English labels** are written in the components. `Design Ref/src/i18n/translations.ts` is not the app catalog. WhatsApp template bodies are English only.
 
 ### Prototype behavior to drop
@@ -101,9 +102,9 @@ Schema outline is section 4 of the plan. These rules are easy to get wrong:
 - Appointment statuses: `scheduled`, `confirmed`, `completed`, `cancelled`, `no_show`. Completing an appointment creates the sale and deducts the service recipe at that branch.
 - Checkout tenders: Cash, Zaad, eDahab, MyCash (Amal Bank). Print the merchant or account numbers once the clinic supplies them. Do not treat MyCash as cash, and do not add Telesom or Dahabshiil unless asked.
 - Imports: Excel (.xlsx) template → upload → row validation → dry run → confirm, through `import_batches` / `import_rows`. Opening stock needs a batch and expiry, or a flagged legacy batch. Revert is allowed only while no sale references the imported rows.
-- Services: optional `service_recipes` (item + qty). Completing a service calls `apply_service_recipe`, which deducts each line with FEFO `service_usage`. **Services are patient-priced only** (retail `service_prices`). No wholesale list on services — wholesale stays on items.
-- Checkout: `checkout_sale` writes `sales` / `sale_lines` / `payments` in one transaction, then FEFO `sale_out` for items and `apply_service_recipe` per service unit. VAT from each line’s tax rate (0 if none). Tenders: Cash, Zaad, eDahab, MyCash. Partial payment → status `partial`. Promotions/points/documents later.
-- Wholesale: on-account is unpaid AR (not a fifth tender). Unpaid wholesale sales need `due_date` and a positive `credit_limit`. `customer_ar_balance` + `apply_customer_payment` settle open invoices FIFO.
+- Services: optional `service_recipes` (item + qty). Completing a service calls `apply_service_recipe`, which deducts each line with FEFO `service_usage`. **Services are patient-priced**; catalog retail is the default, and clinic POS can enter/override the unit price at checkout. No wholesale list on services — wholesale stays on items. Changing the POS customer keeps the cart; service prices stay as entered.
+- Checkout: `checkout_sale` writes `sales` / `sale_lines` / `payments` in one transaction, then FEFO `sale_out` for items and `apply_service_recipe` per service unit. VAT from each line’s tax rate (0 if none). Tenders: Cash, Zaad, eDahab, MyCash. Partial payment → status `partial`. Clinic POS is retail-only (patients + walk-in). Wholesale Orders uses the same RPC with warehouse `branch_id`, wholesale buyer, and optional on-account.
+- Wholesale: on-account is unpaid AR (not a fifth tender). Unpaid wholesale sales need `due_date` and a positive `credit_limit`. `customer_ar_balance` + `apply_customer_payment` settle open invoices FIFO. Appointments are blocked on warehouse branches (DB trigger + UI).
 - Phone numbers are stored in international form (`+252…`).
 - `customers.language` is always `en` for WhatsApp. It does not change the staff UI.
 - Item, service, and promotion names in the app are English. WhatsApp wording is English on `message_templates` (language `en`) and `promotions.whatsapp_message_en`.
@@ -138,7 +139,7 @@ Work in order. Finish a step before starting the next one inside the same phase.
 2. **App skeleton.** Done. `app/` is Vite, React, TypeScript, and Tailwind 4. `Design Ref/` is untouched. English UI only.
 3. **Theme.** Done. Tokens, fonts, dark mode, logo, 10px radius, and print hooks are in `app/`. Left-to-right layout. No language switcher.
 4. **Database.** Done. `dental` is exposed on project `iwnswhnoxbvgyqljfvel`. One branch is seeded. `profiles`, `user_branches`, and `customers` exist, with row-level security. The client is `app/src/lib/supabase.ts` and uses only the anon key. The first email signup becomes the owner.
-5. **Shell.** Done. Email sign-in and account creation, marine sidebar, header, branch switcher, and role-gated routes for the 13 screens. Owners can use All branches on Dashboard and Reports. Four staff accounts (no quick-login buttons) on `@nismile.com` with passwords `{role}123` — see `SESSION.md`. Re-seed with `node scripts/seed-demo-users.mjs` from `app/`. No in-app role switcher and no language switcher.
+5. **Shell.** Done. Email sign-in and account creation, marine sidebar, header, branch switcher, and role-gated routes for the 13 screens. Owners can use All branches on Dashboard and Reports. Four staff accounts (no quick-login buttons) on `@nismile.com` with passwords `{role}123` — see `SESSION.md`. Re-seed with `node scripts/seed-demo-users.mjs` from `app/`. No in-app role switcher and no language switcher. Settings → Users lists only `@nismile.com` / `@nismile.local` staff; Auth signup no longer auto-creates `dental.profiles` (shared Supabase with other apps).
 6. **WhatsApp prep (human, in parallel).** Meta Business verification for M2B + dedicated API number. Phase 6 returned to Meta Cloud API after leaving Twilio.
 
 ### Phase 1 — Inventory and import (about 2–3 weeks)
@@ -207,9 +208,9 @@ Work in order. Finish a step before starting the next one inside the same phase.
 | Topic | Decision |
 |---|---|
 | Supabase | Existing project `iwnswhnoxbvgyqljfvel`. Schema name `dental`. Keys live only in `app/.env.local`. |
-| Branches | One branch at launch. Region somaliland \| ethiopia. Schema and Settings still allow more. |
+| Branches | Kind clinic \| warehouse. Region somaliland \| ethiopia. Warehouse = N.I SMILE Wholesale (stock + Wholesale Orders). Clinics = POS + appointments. |
 | Currency | USD ledger. Manual SLSH/ETB rates in Settings. Docs: Somaliland USD+SLSH; Ethiopia USD+ETB. |
-| Customers | Each customer belongs to one branch. |
+| Customers | One branch each. Retail patients on clinics; wholesale buyers on warehouse. |
 | VAT | Prices exclude VAT. Rate is a Settings field, still blank. |
 | Loyalty | Earn rate and redeem value are Settings fields, still blank. |
 | Thermal | Both widths. Default 80 mm. |
@@ -233,12 +234,16 @@ These do not block the app skeleton.
 ## Step 39 - WhatsApp message polish
 
 - Migration `20261112100000_whatsapp_message_polish.sql`: first-name, friendly date and 12h time helpers, real dentist name (`profiles.display_name`, `set_staff_display_name`, fallback "Our dental team"), time-aware reminders (24h wording chosen at send time; 2h skipped when booked under 2h ahead or already confirmed), and all 12 `message_templates` rewritten with one layout and the contact line `https://wa.me/252634548732`.
-- `send-whatsapp`: image header for template names ending `_v2` / `_v3c` (not receipt/invoice). Document PDF header for `nis_receipt_notice_v3c` / `nis_invoice_notice_v3c`. Live `*_en` templates still get the care line on the last fill-in; `_v3c` uses Meta’s static footer plus a tappable **Contact care** URL button → Edge `care-whatsapp` (opens care WhatsApp +252 63 4548732; Meta blocks `wa.me` on buttons). Shared helpers in `whatsapp_care_footer.ts` / `whatsappCare.ts`.
+- `send-whatsapp`: image/PDF headers for `_v3d`. Meta footer + native **Contact care** PHONE_NUMBER button → `+252 63 4548732`. Shared helpers in `whatsapp_care_footer.ts` / `whatsappCare.ts`.
 - App: Settings > Users has "Name shown to patients"; reminder button now sends `appointment_reminder_24h`.
-- Meta sheet: `docs/WhatsApp-Templates-v3.md`. Live Meta names are `nis_*_v3c` (footer + Contact care → `care-whatsapp` Edge page). Migration `20261115100000_whatsapp_templates_v3c_cutover.sql` points `message_templates` at those names. Older `nis_*_en` / `_v2` / `_v3` / `_v3b` Meta templates are removed with `{ "cleanup_old_templates": true }` on `send-whatsapp`.
+- Meta sheet: `docs/WhatsApp-Templates-v3.md`. **Live:** all 12 `nis_*_v3d` (APPROVED). Contact care = native PHONE_NUMBER → `+252 63 4548732`. Cutover migration `20261115120000` applied; Meta cleanup kept `_v3d` only (other apps’ templates untouched).
 
-## Step 40 - WhatsApp templates v3c live
+## Step 40 - WhatsApp templates v3d phone button (done)
 
-1. `_v3c` templates Approved in Meta.
-2. DentaFlow `message_templates` Meta names = `nis_*_v3c`, status Approved (bodies match the sheet).
-3. Retired Meta templates deleted; production sends use `_v3c` only.
+1. `_v3d` Approved in Meta (Contact care = Call `+252 63 4548732`).
+2. DentaFlow `message_templates` point at `nis_*_v3d`; `send-whatsapp` redeployed; retired `nis_*` names cleaned (none left besides `_v3d`).
+3. Footer number still offers Chat or Call; Contact care button places a native call (no browser).
+
+## Warehouse vs clinic (done)
+
+Migration `20261116120000_branch_kind_warehouse.sql`: `branches.kind` clinic|warehouse; N.I SMILE Wholesale = warehouse; wholesale buyers moved onto warehouse; appointments blocked on warehouse. App: Wholesale Orders `/wholesale`; clinic POS retail-only; nav/guards by kind; Customers locked by branch kind.

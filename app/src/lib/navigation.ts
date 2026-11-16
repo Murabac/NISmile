@@ -1,12 +1,14 @@
 import type { LucideIcon } from 'lucide-react'
 import {
   ArrowLeftRight,
+  Award,
   BarChart3,
   Boxes,
   CalendarDays,
   FileSpreadsheet,
   LayoutDashboard,
   MessageSquare,
+  Package,
   Percent,
   Settings,
   Receipt,
@@ -16,6 +18,7 @@ import {
   Users,
   Wallet,
 } from 'lucide-react'
+import type { BranchKind } from './branches/types.ts'
 import type { StaffRole } from './database.types.ts'
 
 const allRoles: StaffRole[] = [
@@ -32,6 +35,8 @@ export type Screen = {
   path: string
   icon: LucideIcon
   roles: StaffRole[]
+  /** When set, screen is only shown for that branch kind. Omitted = both. */
+  branchKinds?: BranchKind[]
   highlight?: boolean
   promo?: boolean
   allowsAllBranches?: boolean
@@ -52,6 +57,16 @@ export const screens: Screen[] = [
     path: '/pos',
     icon: ShoppingCart,
     roles: ['owner', 'branch_manager', 'receptionist', 'dentist'],
+    branchKinds: ['clinic'],
+    highlight: true,
+  },
+  {
+    id: 'wholesale',
+    label: 'Wholesale Orders',
+    path: '/wholesale',
+    icon: Package,
+    roles: ['owner', 'branch_manager'],
+    branchKinds: ['warehouse'],
     highlight: true,
   },
   {
@@ -95,6 +110,7 @@ export const screens: Screen[] = [
     path: '/services',
     icon: Sparkles,
     roles: ['owner', 'branch_manager', 'dentist'],
+    branchKinds: ['clinic'],
   },
   {
     id: 'customers',
@@ -109,6 +125,7 @@ export const screens: Screen[] = [
     path: '/appointments',
     icon: CalendarDays,
     roles: ['owner', 'branch_manager', 'receptionist', 'dentist'],
+    branchKinds: ['clinic'],
   },
   {
     id: 'promotions',
@@ -136,6 +153,14 @@ export const screens: Screen[] = [
     allowsAllBranches: true,
   },
   {
+    id: 'staff-performance',
+    label: 'Staff performance',
+    path: '/staff-performance',
+    icon: Award,
+    roles: ['owner'],
+    allowsAllBranches: true,
+  },
+  {
     id: 'import',
     label: 'Import',
     path: '/import',
@@ -151,12 +176,28 @@ export const screens: Screen[] = [
   },
 ]
 
-export function screensForRole(role: StaffRole) {
-  return screens.filter((screen) => screen.roles.includes(role))
+export function screensForRole(role: StaffRole, branchKind?: BranchKind | null) {
+  return screens.filter((screen) => {
+    if (!screen.roles.includes(role)) return false
+    if (!screen.branchKinds || screen.branchKinds.length === 0) return true
+    // Owner "All branches": show clinic screens; wholesale needs a warehouse selected.
+    if (!branchKind) return !screen.branchKinds.includes('warehouse')
+    return screen.branchKinds.includes(branchKind)
+  })
 }
 
 export function screenByPath(path: string) {
   return screens.find((screen) => screen.path === path)
+}
+
+export function screenAllowedForBranch(
+  screen: Screen | undefined,
+  branchKind: BranchKind | null,
+): boolean {
+  if (!screen) return true
+  if (!screen.branchKinds || screen.branchKinds.length === 0) return true
+  if (!branchKind) return !screen.branchKinds.includes('warehouse')
+  return screen.branchKinds.includes(branchKind)
 }
 
 export function roleLabel(role: StaffRole) {

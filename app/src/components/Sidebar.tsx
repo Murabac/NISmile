@@ -10,8 +10,10 @@ type SidebarProps = {
 }
 
 export function Sidebar({ mobileOpen, onClose }: SidebarProps) {
-  const { profile } = useAuth()
-  const items = profile ? screensForRole(profile.role) : []
+  const { profile, branchId, branches } = useAuth()
+  const branchKind =
+    branchId === 'all' ? null : (branches.find((b) => b.id === branchId)?.kind ?? null)
+  const items = profile ? screensForRole(profile.role, branchKind) : []
 
   return (
     <>

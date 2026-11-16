@@ -12,8 +12,8 @@
  * Approved Meta template names in message_templates.whatsapp_template_id use
  * the template API (language from WHATSAPP_TEMPLATE_LANGUAGE, default en).
  * Otherwise free-form text (24h customer window).
- * Sale receipt/invoice: when the Meta name is nis_receipt_notice_v3c or
- * nis_invoice_notice_v3c, the A4 PDF rides in the template document header.
+ * Sale receipt/invoice: when the Meta name is nis_receipt_notice_v3d or
+ * nis_invoice_notice_v3d, the A4 PDF rides in the template document header.
  * Live *_en templates still get the care line on the last fill-in. *_v3b
  * templates use Meta's static footer + Contact care URL button
  * (docs/WhatsApp-Templates-v3.md).
@@ -96,20 +96,21 @@ function paramsWithCareFooter(
 function shouldInjectCareIntoParams(templateName: string | null): boolean {
   if (!templateName) return false
   // Meta footer + Contact care button cover care contact.
-  if (/_v3[bc]?$/i.test(templateName)) return false
+  if (/_v3[bcd]?$/i.test(templateName)) return false
   return true
 }
 
 const DEFAULT_HEADER_IMAGE_URL = 'https://nismile.m2btek.com/whatsapp-header.jpg'
 
 const DOCUMENT_HEADER_TEMPLATES = new Set([
+  'nis_receipt_notice_v3d',
+  'nis_invoice_notice_v3d',
   'nis_receipt_notice_v3c',
   'nis_invoice_notice_v3c',
   'nis_receipt_notice_v3b',
   'nis_invoice_notice_v3b',
   'nis_receipt_notice_v3',
   'nis_invoice_notice_v3',
-  // Legacy experiment; keep until the v3 receipt is approved and switched on.
   'nis_receipt_file_en',
 ])
 
@@ -121,7 +122,7 @@ function isDocumentHeaderTemplate(templateName: string | null): boolean {
 function headerImageFor(templateName: string | null): string | null {
   if (!templateName) return null
   if (isDocumentHeaderTemplate(templateName)) return null
-  if (!/_v(?:2|3[bc]?)$/i.test(templateName)) return null
+  if (!/_v(?:2|3[bcd]?)$/i.test(templateName)) return null
   return Deno.env.get('WHATSAPP_HEADER_IMAGE_URL') || DEFAULT_HEADER_IMAGE_URL
 }
 
@@ -375,11 +376,9 @@ function graphError(raw: Record<string, unknown>, fallback: string): string {
 }
 
 const V3_FOOTER = 'Questions? Contact +252 63 4548732'
-/** Opens the human care WhatsApp (not the Cloud API number). */
+/** Native WhatsApp call button to human care (not the Cloud API number). */
 const V3_CARE_BUTTON_TEXT = 'Contact care'
-/** Meta rejects wa.me on URL buttons; this public page links to care WhatsApp. */
-const V3_CARE_BUTTON_URL =
-  'https://iwnswhnoxbvgyqljfvel.supabase.co/functions/v1/care-whatsapp'
+const V3_CARE_PHONE = '+252634548732'
 
 type V3TemplateSpec = {
   name: string
@@ -392,7 +391,7 @@ type V3TemplateSpec = {
 /** Bodies match docs/WhatsApp-Templates-v3.md. Footer + tappable Contact care button. */
 const V3_TEMPLATES: V3TemplateSpec[] = [
   {
-    name: 'nis_appointment_confirmation_v3c',
+    name: 'nis_appointment_confirmation_v3d',
     category: 'UTILITY',
     header: 'IMAGE',
     body:
@@ -400,7 +399,7 @@ const V3_TEMPLATES: V3TemplateSpec[] = [
     examples: ['Maryam', 'Friday, 13 November', '12:00 PM', 'Dr. Hodan Ali'],
   },
   {
-    name: 'nis_appointment_reminder_24h_v3c',
+    name: 'nis_appointment_reminder_24h_v3d',
     category: 'UTILITY',
     header: 'IMAGE',
     body:
@@ -408,7 +407,7 @@ const V3_TEMPLATES: V3TemplateSpec[] = [
     examples: ['Maryam', 'tomorrow', 'Friday, 13 November', '12:00 PM', 'Dr. Hodan Ali'],
   },
   {
-    name: 'nis_appointment_reminder_2h_v3c',
+    name: 'nis_appointment_reminder_2h_v3d',
     category: 'UTILITY',
     header: 'IMAGE',
     body:
@@ -416,7 +415,7 @@ const V3_TEMPLATES: V3TemplateSpec[] = [
     examples: ['Maryam', 'Friday, 13 November', '12:00 PM', 'Dr. Hodan Ali'],
   },
   {
-    name: 'nis_appointment_reschedule_v3c',
+    name: 'nis_appointment_reschedule_v3d',
     category: 'UTILITY',
     header: 'IMAGE',
     body:
@@ -424,7 +423,7 @@ const V3_TEMPLATES: V3TemplateSpec[] = [
     examples: ['Maryam', 'Saturday, 14 November', '10:30 AM', 'Dr. Hodan Ali'],
   },
   {
-    name: 'nis_appointment_cancel_v3c',
+    name: 'nis_appointment_cancel_v3d',
     category: 'UTILITY',
     header: 'IMAGE',
     body:
@@ -432,7 +431,7 @@ const V3_TEMPLATES: V3TemplateSpec[] = [
     examples: ['Maryam', 'Friday, 13 November', '12:00 PM'],
   },
   {
-    name: 'nis_appointment_reply_confirmed_v3c',
+    name: 'nis_appointment_reply_confirmed_v3d',
     category: 'UTILITY',
     header: 'IMAGE',
     body:
@@ -440,7 +439,7 @@ const V3_TEMPLATES: V3TemplateSpec[] = [
     examples: ['Maryam', 'Friday, 13 November', '12:00 PM'],
   },
   {
-    name: 'nis_appointment_reply_cancelled_v3c',
+    name: 'nis_appointment_reply_cancelled_v3d',
     category: 'UTILITY',
     header: 'IMAGE',
     body:
@@ -448,7 +447,7 @@ const V3_TEMPLATES: V3TemplateSpec[] = [
     examples: ['Maryam', 'Friday, 13 November', '12:00 PM'],
   },
   {
-    name: 'nis_receipt_notice_v3c',
+    name: 'nis_receipt_notice_v3d',
     category: 'UTILITY',
     header: 'DOCUMENT',
     body:
@@ -456,7 +455,7 @@ const V3_TEMPLATES: V3TemplateSpec[] = [
     examples: ['Ali', 'RCP-20261113-001', '85.00', '85.00', '0.00', '13 November 2026'],
   },
   {
-    name: 'nis_invoice_notice_v3c',
+    name: 'nis_invoice_notice_v3d',
     category: 'UTILITY',
     header: 'DOCUMENT',
     body:
@@ -464,7 +463,7 @@ const V3_TEMPLATES: V3TemplateSpec[] = [
     examples: ['Ali', 'INV-20261113-001', '340.00', '100.00', '240.00', '20 November 2026'],
   },
   {
-    name: 'nis_payment_due_reminder_v3c',
+    name: 'nis_payment_due_reminder_v3d',
     category: 'UTILITY',
     header: 'IMAGE',
     body:
@@ -472,14 +471,14 @@ const V3_TEMPLATES: V3TemplateSpec[] = [
     examples: ['Ali', '240.00', '20 November 2026'],
   },
   {
-    name: 'nis_promotion_announcement_v3c',
+    name: 'nis_promotion_announcement_v3d',
     category: 'MARKETING',
     header: 'IMAGE',
     body: 'Hello,\n\n{{1}}\n\nReply STOP to opt out.',
     examples: ['10% off teeth whitening until 30 November'],
   },
   {
-    name: 'nis_promotion_ending_soon_v3c',
+    name: 'nis_promotion_ending_soon_v3d',
     category: 'MARKETING',
     header: 'IMAGE',
     body: 'Hello,\n\nEnding soon: {{1}}\n\nReply STOP to opt out.',
@@ -684,9 +683,9 @@ async function submitV3Templates(input: {
               type: 'BUTTONS',
               buttons: [
                 {
-                  type: 'URL',
+                  type: 'PHONE_NUMBER',
                   text: V3_CARE_BUTTON_TEXT,
-                  url: V3_CARE_BUTTON_URL,
+                  phone_number: V3_CARE_PHONE,
                 },
               ],
             },
@@ -725,10 +724,10 @@ async function submitV3Templates(input: {
   }
 }
 
-/** Keep only nis_*_v3c; delete older nis_* Meta templates (_en, _v2, _v3, _v3b, …). */
+/** Keep only nis_*_v3d; delete older nis_* Meta templates (_v3c, _v3b, _en, …). */
 function isRetiredNisTemplate(name: string): boolean {
   if (!/^nis_/i.test(name)) return false
-  if (/_v3c$/i.test(name)) return false
+  if (/_v3d$/i.test(name)) return false
   return true
 }
 

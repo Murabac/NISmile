@@ -42,36 +42,38 @@
         font-weight: 700;
       }
       p {
-        margin: 0 0 24px;
+        margin: 0 0 20px;
         color: var(--muted);
         line-height: 1.45;
       }
-      a.cta {
-        display: inline-block;
-        padding: 14px 22px;
+      .cta {
+        display: block;
+        width: 100%;
+        padding: 18px 22px;
         border-radius: 10px;
         background: var(--accent);
         color: #fff;
+        font-weight: 700;
+        font-size: 1.35rem;
+        letter-spacing: 0.02em;
+        line-height: 1.35;
+        -webkit-user-select: text;
+        user-select: text;
+      }
+      .cta small {
+        display: block;
+        margin-top: 6px;
+        font-size: 0.8rem;
         font-weight: 600;
-        text-decoration: none;
-      }
-      a.cta:focus-visible {
-        outline: 3px solid #9ad4de;
-        outline-offset: 2px;
-      }
-      .phone {
-        margin-top: 18px;
-        font-size: 0.9rem;
-        color: var(--muted);
+        opacity: 0.92;
       }
     </style>
   </head>
   <body>
     <main>
       <h1>N.I SMILE Customer Care</h1>
-      <p>Chat with our care team on WhatsApp.</p>
-      <a class="cta" href="https://wa.me/252634548732">Open WhatsApp care</a>
-      <p class="phone">+252 63 4548732</p>
+      <p>Tap the number for Chat or Call — same as the number on the message.</p>
+      <div class="cta">+252 63 4548732<small>Customer care · Chat or Call</small></div>
     </main>
   </body>
 </html>

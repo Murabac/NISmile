@@ -16,7 +16,7 @@ import {
   setBranchActive,
   updateBranch,
 } from '../lib/branches/api.ts'
-import type { Branch, BranchRegion } from '../lib/branches/types.ts'
+import type { Branch, BranchKind, BranchRegion } from '../lib/branches/types.ts'
 import type { StaffRole } from '../lib/database.types.ts'
 import {
   createExpenseCategory,
@@ -438,6 +438,7 @@ function BranchesPanel({ queryClient }: { queryClient: ReturnType<typeof useQuer
   const [creating, setCreating] = useState(false)
   const [name, setName] = useState('')
   const [region, setRegion] = useState<BranchRegion>('somaliland')
+  const [kind, setKind] = useState<BranchKind>('clinic')
   const [address, setAddress] = useState('')
   const [phone, setPhone] = useState('')
   const [taxId, setTaxId] = useState('')
@@ -450,6 +451,7 @@ function BranchesPanel({ queryClient }: { queryClient: ReturnType<typeof useQuer
   function resetForm() {
     setName('')
     setRegion('somaliland')
+    setKind('clinic')
     setAddress('')
     setPhone('')
     setTaxId('')
@@ -472,6 +474,7 @@ function BranchesPanel({ queryClient }: { queryClient: ReturnType<typeof useQuer
     setEditing(branch)
     setName(branch.name)
     setRegion(branch.region === 'ethiopia' ? 'ethiopia' : 'somaliland')
+    setKind(branch.kind === 'warehouse' ? 'warehouse' : 'clinic')
     setAddress(branch.address ?? '')
     setPhone(branch.phone ?? '')
     setTaxId(branch.tax_id ?? '')
@@ -494,6 +497,7 @@ function BranchesPanel({ queryClient }: { queryClient: ReturnType<typeof useQuer
       const payload = {
         name,
         region,
+        kind,
         address,
         phone,
         tax_id: taxId,
@@ -587,7 +591,7 @@ function BranchesPanel({ queryClient }: { queryClient: ReturnType<typeof useQuer
                 className="mt-1 h-10 w-full rounded-dentaflow border border-line bg-canvas px-3 font-normal"
               />
             </label>
-            <label className="block text-sm font-semibold md:col-span-2">
+            <label className="block text-sm font-semibold">
               Region
               <select
                 value={region}
@@ -596,6 +600,17 @@ function BranchesPanel({ queryClient }: { queryClient: ReturnType<typeof useQuer
               >
                 <option value="somaliland">Somaliland (docs: USD + SLSH)</option>
                 <option value="ethiopia">Ethiopia (docs: USD + ETB)</option>
+              </select>
+            </label>
+            <label className="block text-sm font-semibold">
+              Kind
+              <select
+                value={kind}
+                onChange={(e) => setKind(e.target.value as BranchKind)}
+                className="mt-1 h-10 w-full rounded-dentaflow border border-line bg-canvas px-3 font-normal"
+              >
+                <option value="clinic">Clinic (POS + appointments)</option>
+                <option value="warehouse">Warehouse (stock + wholesale orders)</option>
               </select>
             </label>
             <label className="block text-sm font-semibold md:col-span-2">
@@ -673,6 +688,7 @@ function BranchesPanel({ queryClient }: { queryClient: ReturnType<typeof useQuer
           <thead className="border-b border-line bg-subtle text-xs tracking-wide text-muted uppercase">
             <tr>
               <th className="px-4 py-3 font-semibold">Name</th>
+              <th className="px-4 py-3 font-semibold">Kind</th>
               <th className="px-4 py-3 font-semibold">Region</th>
               <th className="px-4 py-3 font-semibold">Address</th>
               <th className="px-4 py-3 font-semibold">Phone</th>
@@ -683,13 +699,13 @@ function BranchesPanel({ queryClient }: { queryClient: ReturnType<typeof useQuer
           <tbody>
             {branchesQuery.isLoading ? (
               <tr>
-                <td colSpan={6} className="px-4 py-8 text-muted">
+                <td colSpan={7} className="px-4 py-8 text-muted">
                   Loading branches…
                 </td>
               </tr>
             ) : rows.length === 0 ? (
               <tr>
-                <td colSpan={6} className="px-4 py-8 text-muted">
+                <td colSpan={7} className="px-4 py-8 text-muted">
                   No branches yet.
                 </td>
               </tr>
@@ -697,6 +713,7 @@ function BranchesPanel({ queryClient }: { queryClient: ReturnType<typeof useQuer
               rows.map((branch) => (
                 <tr key={branch.id} className="border-b border-line last:border-0">
                   <td className="px-4 py-3 font-semibold">{branch.name}</td>
+                  <td className="px-4 py-3 text-muted capitalize">{branch.kind}</td>
                   <td className="px-4 py-3 text-muted">{regionLabel(branch.region)}</td>
                   <td className="px-4 py-3 text-muted">{branch.address ?? '—'}</td>
                   <td className="px-4 py-3 font-mono text-xs">{branch.phone ?? '—'}</td>

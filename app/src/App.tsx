@@ -9,6 +9,7 @@ import { LoginPage } from './pages/LoginPage.tsx'
 import { CustomersPage } from './pages/CustomersPage.tsx'
 import { AppointmentsPage } from './pages/AppointmentsPage.tsx'
 import { PosPage } from './pages/PosPage.tsx'
+import { WholesaleOrdersPage } from './pages/WholesaleOrdersPage.tsx'
 import { SalesPage } from './pages/SalesPage.tsx'
 import { ScreenPage } from './pages/ScreenPage.tsx'
 import { ExpensesPage } from './pages/ExpensesPage.tsx'
@@ -20,6 +21,7 @@ import { TransfersPage } from './pages/TransfersPage.tsx'
 import { WhatsAppPage } from './pages/WhatsAppPage.tsx'
 import { PromotionsPage } from './pages/PromotionsPage.tsx'
 import { ReportsPage } from './pages/ReportsPage.tsx'
+import { StaffPerformancePage } from './pages/StaffPerformancePage.tsx'
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -33,6 +35,7 @@ const queryClient = new QueryClient({
 function screenElement(path: string) {
   if (path === '/') return <DashboardPage />
   if (path === '/pos') return <PosPage />
+  if (path === '/wholesale') return <WholesaleOrdersPage />
   if (path === '/sales') return <SalesPage />
   if (path === '/stock') return <StockPage />
   if (path === '/transfers') return <TransfersPage />
@@ -44,6 +47,7 @@ function screenElement(path: string) {
   if (path === '/promotions') return <PromotionsPage />
   if (path === '/whatsapp') return <WhatsAppPage />
   if (path === '/reports') return <ReportsPage />
+  if (path === '/staff-performance') return <StaffPerformancePage />
   if (path === '/import') return <ImportPage />
   if (path === '/settings') return <SettingsPage />
   return <ScreenPage />

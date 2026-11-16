@@ -7,7 +7,7 @@ import {
   type ReactNode,
 } from 'react'
 import type { Session } from '@supabase/supabase-js'
-import type { BranchRegion } from './branches/types.ts'
+import type { BranchKind, BranchRegion } from './branches/types.ts'
 import type { StaffRole } from './database.types.ts'
 import { supabase } from './supabase.ts'
 
@@ -15,6 +15,7 @@ type Branch = {
   id: string
   name: string
   region: BranchRegion
+  kind: BranchKind
   address: string | null
 }
 
@@ -72,7 +73,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   async function loadBranches() {
     const { data, error } = await supabase
       .from('branches')
-      .select('id, name, region, address')
+      .select('id, name, region, kind, address')
       .eq('active', true)
       .order('name')
     if (error) throw error
@@ -80,6 +81,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       (data ?? []).map((b) => ({
         ...b,
         region: b.region === 'ethiopia' ? 'ethiopia' : 'somaliland',
+        kind: b.kind === 'warehouse' ? 'warehouse' : 'clinic',
       })),
     )
   }
@@ -104,7 +106,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           .single(),
         supabase
           .from('branches')
-          .select('id, name, region, address')
+          .select('id, name, region, kind, address')
           .eq('active', true)
           .order('name'),
       ])
@@ -114,6 +116,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         (branchResult.data ?? []).map((b) => ({
           ...b,
           region: b.region === 'ethiopia' ? 'ethiopia' : 'somaliland',
+          kind: b.kind === 'warehouse' ? 'warehouse' : 'clinic',
         })),
       )
       setLoading(false)

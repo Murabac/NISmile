@@ -26,6 +26,23 @@ export async function runReport(input: {
   return data as ReportResult
 }
 
+export async function fetchStaffPerformance(input: {
+  branchId: string | 'all'
+  period: ReportPeriod
+  fromDate?: string | null
+  toDate?: string | null
+}): Promise<ReportResult> {
+  const custom = input.period === 'custom'
+  const { data, error } = await supabase.rpc('staff_performance_report', {
+    p_branch_id: input.branchId === 'all' ? null : input.branchId,
+    p_period: input.period,
+    p_from_date: custom ? input.fromDate ?? null : null,
+    p_to_date: custom ? input.toDate ?? null : null,
+  })
+  if (error) throw error
+  return data as ReportResult
+}
+
 export async function fetchDashboardSummary(
   branchId: string | 'all',
 ): Promise<DashboardSummary> {

@@ -69,6 +69,7 @@ export type Database = {
           id: string
           name: string
           region: 'somaliland' | 'ethiopia'
+          kind: 'clinic' | 'warehouse'
           address: string | null
           phone: string | null
           tax_id: string | null
@@ -82,6 +83,7 @@ export type Database = {
           id?: string
           name: string
           region?: 'somaliland' | 'ethiopia'
+          kind?: 'clinic' | 'warehouse'
           address?: string | null
           phone?: string | null
           tax_id?: string | null
@@ -94,6 +96,7 @@ export type Database = {
         Update: {
           name?: string
           region?: 'somaliland' | 'ethiopia'
+          kind?: 'clinic' | 'warehouse'
           address?: string | null
           phone?: string | null
           tax_id?: string | null
@@ -1873,6 +1876,15 @@ export type Database = {
       run_report: {
         Args: {
           p_report_type: string
+          p_branch_id?: string | null
+          p_period?: string
+          p_from_date?: string | null
+          p_to_date?: string | null
+        }
+        Returns: unknown
+      }
+      staff_performance_report: {
+        Args: {
           p_branch_id?: string | null
           p_period?: string
           p_from_date?: string | null

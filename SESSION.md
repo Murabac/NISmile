@@ -60,4 +60,4 @@ Update this file when you finish a chunk of work on either machine.
 
 **39** - WhatsApp message polish done (migration 20261112100000, send-whatsapp, Settings display name). Live sends still use approved `nis_*_en`.
 
-**40** - Cut over to approved `nis_*_v3c` (footer + Contact care). Migration `20261115100000_whatsapp_templates_v3c_cutover.sql`. Old Meta `nis_*` names removed via `cleanup_old_templates`.
+**40** - `nis_*_v3d` Approved and live. Contact care PHONE_NUMBER → +252 63 4548732. Cutover migration applied; Meta cleanup keeps `_v3d` only.

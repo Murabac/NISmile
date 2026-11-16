@@ -22,7 +22,8 @@ const INK = 'FF10262D'
 const MUTED = 'FF536E75'
 
 type ExportInput = {
-  type: ReportType
+  type?: ReportType
+  title?: string
   period: ReportPeriod
   branchLabel: string
   data: ReportResult
@@ -34,9 +35,9 @@ export async function exportReportExcel(input: ExportInput): Promise<void> {
   workbook.created = new Date()
   workbook.modified = new Date()
 
-  const title = reportTitle(input.type)
+  const title = input.title ?? (input.type ? reportTitle(input.type) : 'Report')
   const subtitle = reportSubtitle({
-    type: input.type,
+    type: input.type ?? 'sales',
     period: input.period,
     branchLabel: input.branchLabel,
     startsAt: input.data.starts_at,

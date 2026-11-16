@@ -1,4 +1,4 @@
-import { useMemo, useState, type FormEvent } from 'react'
+import { useEffect, useMemo, useState, type FormEvent } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { FileText, MessageSquare, Plus, Printer, RotateCcw, Search, Users, X } from 'lucide-react'
 import { Drawer } from '../components/Drawer.tsx'
@@ -49,9 +49,14 @@ function emptyTenders(): TenderDraft {
 }
 
 export function CustomersPage() {
-  const { branchId } = useAuth()
+  const { branchId, branches } = useAuth()
   const queryClient = useQueryClient()
-  const [tab, setTab] = useState<CustomerType>('wholesale')
+  const activeBranch = branches.find((b) => b.id === branchId)
+  const branchKind = activeBranch?.kind ?? 'clinic'
+  const isWarehouse = branchKind === 'warehouse'
+  const allowedType: CustomerType = isWarehouse ? 'wholesale' : 'retail'
+
+  const [tab, setTab] = useState<CustomerType>(allowedType)
   const [search, setSearch] = useState('')
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const [drawerOpen, setDrawerOpen] = useState(false)
@@ -67,7 +72,7 @@ export function CustomersPage() {
 
   const [name, setName] = useState('')
   const [phone, setPhone] = useState('')
-  const [customerType, setCustomerType] = useState<CustomerType>('retail')
+  const [customerType, setCustomerType] = useState<CustomerType>(allowedType)
   const [subtype, setSubtype] = useState<WholesaleSubtype>('clinic')
   const [whatsappOptIn, setWhatsappOptIn] = useState(true)
   const [creditLimit, setCreditLimit] = useState('1000')
@@ -76,6 +81,12 @@ export function CustomersPage() {
   const [showInactive, setShowInactive] = useState(false)
 
   const branchReady = branchId !== 'all'
+
+  useEffect(() => {
+    setTab(allowedType)
+    setCustomerType(allowedType)
+    setSelectedId(null)
+  }, [allowedType, branchId])
 
   const customersQuery = useQuery({
     queryKey: ['customers', branchId, showInactive],
@@ -203,10 +214,10 @@ export function CustomersPage() {
     setEditing(null)
     setName('')
     setPhone('')
-    setCustomerType(tab)
+    setCustomerType(allowedType)
     setSubtype('clinic')
     setWhatsappOptIn(true)
-    setCreditLimit(tab === 'wholesale' ? '1000' : '')
+    setCreditLimit(allowedType === 'wholesale' ? '1000' : '')
     setNotes('')
     setActive(true)
     setFormError(null)
@@ -239,15 +250,16 @@ export function CustomersPage() {
       setFormError('Name is required.')
       return
     }
+    const lockedType = allowedType
     saveMutation.mutate({
       name,
       phone: phone || null,
-      customer_type: customerType,
-      subtype: customerType === 'wholesale' ? subtype : null,
+      customer_type: lockedType,
+      subtype: lockedType === 'wholesale' ? subtype : null,
       language: 'en',
       whatsapp_opt_in: whatsappOptIn,
       credit_limit:
-        customerType === 'wholesale' && creditLimit !== '' ? Number(creditLimit) : null,
+        lockedType === 'wholesale' && creditLimit !== '' ? Number(creditLimit) : null,
       notes: notes || null,
       active,
     })
@@ -281,7 +293,9 @@ export function CustomersPage() {
         <div>
           <h1 className="text-3xl font-semibold">Customers & accounts</h1>
           <p className="mt-1 text-sm text-muted">
-            Wholesale credit lines and retail patients. Statements print in the browser (PDF later).
+            {isWarehouse
+              ? 'Wholesale buyers on this warehouse. Credit, statements, and payments.'
+              : 'Retail patients on this clinic. Wholesale buyers live on the warehouse branch.'}
           </p>
         </div>
         <button
@@ -290,30 +304,21 @@ export function CustomersPage() {
           className="inline-flex h-10 items-center gap-2 rounded-dentaflow bg-marine px-4 text-sm font-bold text-white"
         >
           <Plus className="h-4 w-4" />
-          New customer
+          {isWarehouse ? 'New buyer' : 'New patient'}
         </button>
       </div>
 
       <div className="flex flex-col gap-3 rounded-dentaflow border border-line bg-surface p-3 sm:flex-row sm:items-center sm:justify-between">
         <div className="inline-flex rounded-lg bg-canvas p-1">
-          <button
-            type="button"
-            onClick={() => setTab('wholesale')}
-            className={`rounded-md px-4 py-1.5 text-xs font-bold ${
-              tab === 'wholesale' ? 'bg-surface shadow-sm' : 'text-muted'
-            }`}
-          >
-            Wholesale ({customers.filter((c) => c.customer_type === 'wholesale').length})
-          </button>
-          <button
-            type="button"
-            onClick={() => setTab('retail')}
-            className={`rounded-md px-4 py-1.5 text-xs font-bold ${
-              tab === 'retail' ? 'bg-surface shadow-sm' : 'text-muted'
-            }`}
-          >
-            Retail ({customers.filter((c) => c.customer_type === 'retail').length})
-          </button>
+          {isWarehouse ? (
+            <span className="rounded-md bg-surface px-4 py-1.5 text-xs font-bold shadow-sm">
+              Wholesale ({customers.filter((c) => c.customer_type === 'wholesale').length})
+            </span>
+          ) : (
+            <span className="rounded-md bg-surface px-4 py-1.5 text-xs font-bold shadow-sm">
+              Retail ({customers.filter((c) => c.customer_type === 'retail').length})
+            </span>
+          )}
         </div>
         <div className="flex flex-wrap items-center gap-3">
           <label className="inline-flex items-center gap-2 text-xs font-semibold text-muted">
@@ -715,18 +720,11 @@ export function CustomersPage() {
               className="mt-1 h-10 w-full rounded-dentaflow border border-line bg-canvas px-3 font-normal"
             />
           </label>
-          <label className="block text-sm font-semibold">
-            Type
-            <select
-              value={customerType}
-              onChange={(event) => setCustomerType(event.target.value as CustomerType)}
-              className="mt-1 h-10 w-full rounded-dentaflow border border-line bg-canvas px-3 font-normal"
-            >
-              <option value="retail">Retail</option>
-              <option value="wholesale">Wholesale</option>
-            </select>
-          </label>
-          {customerType === 'wholesale' ? (
+          <p className="rounded-dentaflow bg-canvas px-3 py-2 text-xs text-muted">
+            Type locked to {allowedType === 'wholesale' ? 'wholesale buyer' : 'retail patient'} for
+            this branch.
+          </p>
+          {allowedType === 'wholesale' ? (
             <>
               <label className="block text-sm font-semibold">
                 Subtype

@@ -2,7 +2,7 @@ import { supabase } from '../supabase.ts'
 import type { Branch, BranchInput, DeleteBranchResult } from './types.ts'
 
 const BRANCH_COLS =
-  'id, name, region, address, phone, tax_id, zaad, edahab, mycash, active, created_at' as const
+  'id, name, region, kind, address, phone, tax_id, zaad, edahab, mycash, active, created_at' as const
 
 export async function fetchBranches(includeInactive = true): Promise<Branch[]> {
   let query = supabase.from('branches').select(BRANCH_COLS).order('name')
@@ -18,6 +18,7 @@ export async function createBranch(input: BranchInput): Promise<Branch> {
     .insert({
       name: input.name.trim(),
       region: input.region,
+      kind: input.kind === 'warehouse' ? 'warehouse' : 'clinic',
       address: emptyToNull(input.address),
       phone: emptyToNull(input.phone),
       tax_id: emptyToNull(input.tax_id),
@@ -38,6 +39,7 @@ export async function updateBranch(id: string, input: BranchInput & { active?: b
     .update({
       name: input.name.trim(),
       region: input.region,
+      kind: input.kind === 'warehouse' ? 'warehouse' : 'clinic',
       address: emptyToNull(input.address),
       phone: emptyToNull(input.phone),
       tax_id: emptyToNull(input.tax_id),
@@ -65,10 +67,11 @@ export async function setBranchActive(id: string, active: boolean): Promise<Bran
 }
 
 function normalizeBranch(row: unknown): Branch {
-  const r = row as Branch
+  const r = row as Branch & { kind?: string | null }
   return {
     ...r,
     region: r.region === 'ethiopia' ? 'ethiopia' : 'somaliland',
+    kind: r.kind === 'warehouse' ? 'warehouse' : 'clinic',
   }
 }
 

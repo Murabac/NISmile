@@ -11,6 +11,8 @@ export type CheckoutLineInput = {
   item_id?: string | null
   service_id?: string | null
   qty: number
+  /** Service lines: price entered at checkout (ex-VAT). Items ignore this. */
+  unit_price?: number | null
 }
 
 export type CheckoutPaymentInput = {
