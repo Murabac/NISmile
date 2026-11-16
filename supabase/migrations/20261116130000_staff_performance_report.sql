@@ -20,7 +20,7 @@ declare
   v_rows jsonb;
   v_totals jsonb;
 begin
-  select role::text into v_role from dental.profiles where id = auth.uid();
+  select role::text into v_role from dental.profiles where user_id = auth.uid();
   if v_role is distinct from 'owner' then
     raise exception 'Staff performance is owner-only';
   end if;
@@ -110,6 +110,7 @@ begin
         when sid.created_by is null then 'Unassigned'
         else coalesce(
           nullif(trim(p.display_name), ''),
+          nullif(trim(p.name), ''),
           nullif(split_part(u.email, '@', 1), ''),
           sid.created_by::text
         )
@@ -132,7 +133,7 @@ begin
     left join sales_agg sa on sa.created_by is not distinct from sid.created_by
     left join sale_lines_agg sla on sla.created_by is not distinct from sid.created_by
     left join appt_agg aa on aa.created_by is not distinct from sid.created_by
-    left join dental.profiles p on p.id = sid.created_by
+    left join dental.profiles p on p.user_id = sid.created_by
     left join auth.users u on u.id = sid.created_by
   )
   select coalesce(

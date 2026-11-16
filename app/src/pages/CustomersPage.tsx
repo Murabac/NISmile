@@ -72,7 +72,6 @@ export function CustomersPage() {
 
   const [name, setName] = useState('')
   const [phone, setPhone] = useState('')
-  const [customerType, setCustomerType] = useState<CustomerType>(allowedType)
   const [subtype, setSubtype] = useState<WholesaleSubtype>('clinic')
   const [whatsappOptIn, setWhatsappOptIn] = useState(true)
   const [creditLimit, setCreditLimit] = useState('1000')
@@ -84,7 +83,6 @@ export function CustomersPage() {
 
   useEffect(() => {
     setTab(allowedType)
-    setCustomerType(allowedType)
     setSelectedId(null)
   }, [allowedType, branchId])
 
@@ -214,7 +212,6 @@ export function CustomersPage() {
     setEditing(null)
     setName('')
     setPhone('')
-    setCustomerType(allowedType)
     setSubtype('clinic')
     setWhatsappOptIn(true)
     setCreditLimit(allowedType === 'wholesale' ? '1000' : '')
@@ -228,7 +225,6 @@ export function CustomersPage() {
     setEditing(customer)
     setName(customer.name)
     setPhone(customer.phone ?? '')
-    setCustomerType(customer.customer_type)
     setSubtype((customer.subtype as WholesaleSubtype) || 'clinic')
     setWhatsappOptIn(customer.whatsapp_opt_in)
     setCreditLimit(customer.credit_limit == null ? '' : String(customer.credit_limit))
