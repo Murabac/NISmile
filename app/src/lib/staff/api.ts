@@ -79,6 +79,52 @@ export async function setStaffDisplayName(userId: string, displayName: string): 
   if (error) throw error
 }
 
+/** Owner self-service: update staff name + patient display name on own profile. */
+export async function updateOwnProfileNames(input: {
+  name: string
+  displayName: string
+}): Promise<void> {
+  const {
+    data: { user },
+    error: userError,
+  } = await supabase.auth.getUser()
+  if (userError) throw userError
+  if (!user) throw new Error('Not signed in.')
+
+  const name = input.name.trim()
+  if (!name) throw new Error('Name is required.')
+
+  const { error } = await supabase
+    .from('profiles')
+    .update({
+      name,
+      display_name: input.displayName.trim() ? input.displayName.trim().slice(0, 60) : null,
+    })
+    .eq('user_id', user.id)
+  if (error) throw error
+}
+
+export async function updateOwnAuthCredentials(input: {
+  email?: string | null
+  password?: string | null
+}): Promise<{ emailChangePending: boolean }> {
+  const email = input.email?.trim() ? input.email.trim().toLowerCase() : null
+  const password = input.password?.trim() ? input.password : null
+  if (!email && !password) return { emailChangePending: false }
+
+  const payload: { email?: string; password?: string } = {}
+  if (email) payload.email = email
+  if (password) payload.password = password
+
+  const { data, error } = await supabase.auth.updateUser(payload)
+  if (error) throw error
+
+  const emailChangePending = Boolean(
+    email && data.user?.new_email && data.user.new_email.toLowerCase() !== data.user.email?.toLowerCase(),
+  )
+  return { emailChangePending }
+}
+
 export async function setStaffLoginEnabled(userId: string, enabled: boolean): Promise<void> {
   const { error } = await supabase.rpc('set_staff_login_enabled', {
     p_user_id: userId,

@@ -23,6 +23,7 @@ type Profile = {
   user_id: string
   role: StaffRole
   name: string
+  display_name: string | null
 }
 
 type AuthValue = {
@@ -33,6 +34,7 @@ type AuthValue = {
   branchId: string | 'all'
   setBranchId: (id: string | 'all') => void
   refreshBranches: () => Promise<void>
+  refreshProfile: () => Promise<void>
   signIn: (email: string, password: string) => Promise<string | null>
   signUp: (name: string, email: string, password: string) => Promise<string | null>
   signOut: () => Promise<void>
@@ -86,6 +88,25 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     )
   }
 
+  async function loadProfile(id: string) {
+    const { data, error } = await supabase
+      .from('profiles')
+      .select('user_id, role, name, display_name')
+      .eq('user_id', id)
+      .single()
+    if (error) throw error
+    setProfile(
+      data
+        ? {
+            user_id: data.user_id,
+            role: data.role,
+            name: data.name,
+            display_name: data.display_name ?? null,
+          }
+        : null,
+    )
+  }
+
   useEffect(() => {
     if (!userId) {
       setProfile(null)
@@ -98,28 +119,40 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setLoading(true)
 
     async function loadStaff() {
-      const [profileResult, branchResult] = await Promise.all([
-        supabase
-          .from('profiles')
-          .select('user_id, role, name')
-          .eq('user_id', id)
-          .single(),
-        supabase
-          .from('branches')
-          .select('id, name, region, kind, address')
-          .eq('active', true)
-          .order('name'),
-      ])
-      if (cancelled) return
-      setProfile(profileResult.data ?? null)
-      setBranches(
-        (branchResult.data ?? []).map((b) => ({
-          ...b,
-          region: b.region === 'ethiopia' ? 'ethiopia' : 'somaliland',
-          kind: b.kind === 'warehouse' ? 'warehouse' : 'clinic',
-        })),
-      )
-      setLoading(false)
+      try {
+        const [profileResult, branchResult] = await Promise.all([
+          supabase
+            .from('profiles')
+            .select('user_id, role, name, display_name')
+            .eq('user_id', id)
+            .single(),
+          supabase
+            .from('branches')
+            .select('id, name, region, kind, address')
+            .eq('active', true)
+            .order('name'),
+        ])
+        if (cancelled) return
+        setProfile(
+          profileResult.data
+            ? {
+                user_id: profileResult.data.user_id,
+                role: profileResult.data.role,
+                name: profileResult.data.name,
+                display_name: profileResult.data.display_name ?? null,
+              }
+            : null,
+        )
+        setBranches(
+          (branchResult.data ?? []).map((b) => ({
+            ...b,
+            region: b.region === 'ethiopia' ? 'ethiopia' : 'somaliland',
+            kind: b.kind === 'warehouse' ? 'warehouse' : 'clinic',
+          })),
+        )
+      } finally {
+        if (!cancelled) setLoading(false)
+      }
     }
 
     void loadStaff()
@@ -166,6 +199,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       refreshBranches: async () => {
         await loadBranches()
       },
+      refreshProfile: async () => {
+        if (!userId) return
+        await loadProfile(userId)
+      },
       signIn: async (email, password) => {
         const { error } = await supabase.auth.signInWithPassword({ email, password })
         return error?.message ?? null
@@ -184,7 +221,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         await supabase.auth.signOut()
       },
     }),
-    [loading, session, profile, branches, branchId],
+    [loading, session, profile, branches, branchId, userId],
   )
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>
